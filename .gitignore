@@ -1,0 +1,20 @@
+# R package files
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# Compiled files
+src/*.o
+src/*.so
+src/*.dll
+src/rust/target/
+src/.cargo/
+
+# Documentation artifacts
+docs/
+man/*.Rd
+
+# Test artifacts
+tests/testthat/Rplots.pdf

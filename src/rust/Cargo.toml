@@ -1,0 +1,34 @@
+[package]
+name = "spopt"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["staticlib"]
+name = "spopt"
+
+[dependencies]
+extendr-api = "0.7"
+
+# Graph operations (MST, connectivity)
+petgraph = "0.6"
+
+# Numerical computing
+ndarray = { version = "0.16", features = ["rayon"] }
+
+# Sparse matrices
+sprs = "0.11"
+
+# MIP solver
+highs = "1.8"
+
+# Random number generation (for SA, tabu)
+rand = "0.8"
+rand_chacha = "0.3"
+
+# Parallelism
+rayon = "1.10"
+
+[profile.release]
+lto = true
+codegen-units = 1
