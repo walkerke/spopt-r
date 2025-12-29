@@ -15,6 +15,13 @@
 #' @param threshold Numeric. Minimum sum of `threshold_var` required per region.
 #' @param weights Spatial weights specification. One of "queen" (default),
 #'   "rook", or an nb object from spdep.
+#' @param compact Logical. If TRUE, optimize for region compactness in addition
+#'   to attribute homogeneity. Compact regions have more regular shapes, which
+#'   is useful for sales territories, patrol areas, and electoral districts.
+#'   Default is FALSE.
+#' @param compact_weight Numeric between 0 and 1. Weight for compactness vs
+#'   attribute homogeneity when `compact = TRUE`. Higher values prioritize
+#'   compact shapes over attribute similarity. Default is 0.5.
 #' @param n_iterations Integer. Number of construction phase iterations (default 100).
 #'   Higher values explore more random starting solutions.
 #' @param n_sa_iterations Integer. Number of simulated annealing iterations (default 100).
@@ -36,6 +43,8 @@
 #'     \item threshold_var: Name of threshold variable
 #'     \item threshold: Threshold value used
 #'     \item solve_time: Time to solve in seconds
+#'     \item mean_compactness: Mean Polsby-Popper compactness (if `compact = TRUE`)
+#'     \item region_compactness: Per-region compactness scores (if `compact = TRUE`)
 #'   }
 #'
 #' @details
@@ -53,6 +62,14 @@
 #'   \item Simulated annealing phase: Refines solutions by moving border areas
 #'     between regions to minimize within-region dissimilarity while respecting
 #'     constraints.
+#' }
+#'
+#' When `compact = TRUE`, the algorithm additionally optimizes for compact region
+#' shapes based on Feng, Rey, & Wei (2022). Compact regions:
+#' \itemize{
+#'   \item Minimize travel time within regions (useful for service territories)
+#'   \item Reduce gerrymandering potential (electoral districts)
+#'   \item Often result in finding MORE regions due to efficient space usage
 #' }
 #'
 #' This implementation is optimized for speed using:
@@ -78,6 +95,19 @@
 #' # Check number of regions created
 #' attr(result, "spopt")$n_regions
 #'
+#' # With compactness optimization (for sales territories)
+#' result_compact <- max_p_regions(
+#'   nc,
+#'   attrs = c("SID74", "SID79"),
+#'   threshold_var = "BIR74",
+#'   threshold = 100000,
+#'   compact = TRUE,
+#'   compact_weight = 0.5
+#' )
+#'
+#' # Check compactness
+#' attr(result_compact, "spopt")$mean_compactness
+#'
 #' # Plot results
 #' plot(result[".region"])
 #' }
@@ -86,9 +116,12 @@
 #' Duque, J. C., Anselin, L., & Rey, S. J. (2012). The max-p-regions problem.
 #' Journal of Regional Science, 52(3), 397-419.
 #'
-#' Wei, R., Rey, S., & Knaap, E. (2020). Efficient regionalization for spatially
+#' Wei, R., Rey, S., & Knaap, E. (2021). Efficient regionalization for spatially
 #' explicit neighborhood delineation. International Journal of Geographical
-#' Information Science, 35(1), 135-151.
+#' Information Science, 35(1), 135-151. \doi{10.1080/13658816.2020.1759806}
+#'
+#' Feng, X., Rey, S., & Wei, R. (2022). The max-p-compact-regions problem.
+#' Transactions in GIS, 26, 717-734. \doi{10.1111/tgis.12874}
 #'
 #' @export
 max_p_regions <- function(data,
@@ -96,6 +129,8 @@ max_p_regions <- function(data,
                           threshold_var,
                           threshold,
                           weights = "queen",
+                          compact = FALSE,
+                          compact_weight = 0.5,
                           n_iterations = 100L,
                           n_sa_iterations = 100L,
                           cooling_rate = 0.99,
@@ -152,6 +187,23 @@ max_p_regions <- function(data,
   if (!is.numeric(tabu_length) || tabu_length < 0) {
     stop("`tabu_length` must be a non-negative integer", call. = FALSE)
   }
+  if (!is.logical(compact) || length(compact) != 1) {
+    stop("`compact` must be TRUE or FALSE", call. = FALSE)
+  }
+  if (!is.numeric(compact_weight) || compact_weight < 0 || compact_weight > 1) {
+    stop("`compact_weight` must be between 0 and 1", call. = FALSE)
+  }
+
+  # Extract centroids if compactness is enabled
+  centroids_x <- NULL
+  centroids_y <- NULL
+  if (compact) {
+    # Get centroids of all units
+    cents <- sf::st_centroid(sf::st_geometry(data))
+    coords <- sf::st_coordinates(cents)
+    centroids_x <- as.numeric(coords[, 1])
+    centroids_y <- as.numeric(coords[, 2])
+  }
 
   # Extract attributes for dissimilarity
   attr_matrix <- extract_attrs(data, attrs)
@@ -190,7 +242,11 @@ max_p_regions <- function(data,
     n_sa_iterations = as.integer(n_sa_iterations),
     cooling_rate = as.numeric(cooling_rate),
     tabu_length = as.integer(tabu_length),
-    seed = if (!is.null(seed)) as.integer(seed) else NULL
+    seed = if (!is.null(seed)) as.integer(seed) else NULL,
+    centroids_x = centroids_x,
+    centroids_y = centroids_y,
+    compact = compact,
+    compact_weight = as.numeric(compact_weight)
   )
 
   end_time <- Sys.time()
@@ -215,6 +271,12 @@ max_p_regions <- function(data,
   # Compute region statistics
   region_stats <- compute_region_stats(result, threshold_var, threshold)
 
+  # Compute Polsby-Popper compactness if compact mode was used
+  compactness_metrics <- NULL
+  if (compact) {
+    compactness_metrics <- compute_polsby_popper(result)
+  }
+
   # Attach metadata
   metadata <- list(
     algorithm = "max_p",
@@ -226,7 +288,11 @@ max_p_regions <- function(data,
     solve_time = as.numeric(difftime(end_time, start_time, units = "secs")),
     scaled = scale,
     n_iterations = n_iterations,
-    n_sa_iterations = n_sa_iterations
+    n_sa_iterations = n_sa_iterations,
+    compact = compact,
+    compact_weight = compact_weight,
+    mean_compactness = if (!is.null(compactness_metrics)) compactness_metrics$mean else NULL,
+    region_compactness = if (!is.null(compactness_metrics)) compactness_metrics$by_region else NULL
   )
 
   attach_spopt_metadata(result, metadata)
@@ -248,4 +314,44 @@ compute_region_stats <- function(result, threshold_var, threshold) {
   })
 
   do.call(rbind, lapply(stats, as.data.frame))
+}
+
+#' Compute Polsby-Popper compactness for regions
+#'
+#' The Polsby-Popper measure is: 4 * pi * Area / Perimeter^2
+#' Ranges from 0 to 1, where 1 is a perfect circle (most compact).
+#'
+#' @keywords internal
+compute_polsby_popper <- function(result) {
+  regions <- sort(unique(result$.region))
+  by_region <- numeric(length(regions))
+
+  for (i in seq_along(regions)) {
+    r <- regions[i]
+    region_geom <- sf::st_union(sf::st_geometry(result[result$.region == r, ]))
+
+    # Compute area and perimeter
+    area <- as.numeric(sf::st_area(region_geom))
+
+    # Compute perimeter - use boundary length
+    boundary <- sf::st_boundary(region_geom)
+    if (inherits(boundary, "sfc_MULTILINESTRING")) {
+      boundary <- sf::st_cast(boundary, "LINESTRING")
+    }
+    perimeter <- sum(as.numeric(sf::st_length(boundary)))
+
+    # Polsby-Popper: 4 * pi * A / P^2
+    if (perimeter > 0) {
+      by_region[i] <- 4 * pi * area / (perimeter^2)
+    } else {
+      by_region[i] <- 0
+    }
+  }
+
+  names(by_region) <- as.character(regions)
+
+  list(
+    mean = mean(by_region, na.rm = TRUE),
+    by_region = by_region
+  )
 }

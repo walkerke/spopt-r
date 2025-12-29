@@ -3,75 +3,13 @@
 //! Minimize the maximum distance from any demand point to its nearest facility.
 
 use extendr_api::prelude::*;
-use crate::locate::solver::solve_mip;
+use highs::{HighsModelStatus, Sense, RowProblem, Col};
 
 /// Solve P-Center facility location problem
 pub fn solve(cost_matrix: RMatrix<f64>, n_facilities: usize) -> List {
     let n_demand = cost_matrix.nrows();
     let n_fac = cost_matrix.ncols();
     let p = n_facilities;
-
-    // Variables:
-    // W = maximum distance (continuous)
-    // y[j] = 1 if facility j selected
-    // x[i][j] = 1 if demand i assigned to facility j
-    let n_vars = 1 + n_fac + n_demand * n_fac;
-    let w_idx = 0;
-    let y_start = 1;
-    let x_start = 1 + n_fac;
-
-    // Objective: minimize W
-    let mut obj_coeffs = vec![0.0; n_vars];
-    obj_coeffs[w_idx] = 1.0;
-
-    let mut constraint_matrix: Vec<Vec<f64>> = Vec::new();
-    let mut constraint_rhs: Vec<f64> = Vec::new();
-    let mut constraint_sense: Vec<char> = Vec::new();
-
-    // 1. sum_j y[j] = p
-    let mut c1 = vec![0.0; n_vars];
-    for j in 0..n_fac {
-        c1[y_start + j] = 1.0;
-    }
-    constraint_matrix.push(c1);
-    constraint_rhs.push(p as f64);
-    constraint_sense.push('=');
-
-    // 2. sum_j x[i][j] = 1 for all i
-    for i in 0..n_demand {
-        let mut row = vec![0.0; n_vars];
-        for j in 0..n_fac {
-            row[x_start + i * n_fac + j] = 1.0;
-        }
-        constraint_matrix.push(row);
-        constraint_rhs.push(1.0);
-        constraint_sense.push('=');
-    }
-
-    // 3. x[i][j] <= y[j]
-    for i in 0..n_demand {
-        for j in 0..n_fac {
-            let mut row = vec![0.0; n_vars];
-            row[x_start + i * n_fac + j] = 1.0;
-            row[y_start + j] = -1.0;
-            constraint_matrix.push(row);
-            constraint_rhs.push(0.0);
-            constraint_sense.push('<');
-        }
-    }
-
-    // 4. W >= d[i][j] * x[i][j] for all i,j (minmax constraint)
-    // sum_j (d[i][j] * x[i][j]) <= W for all i
-    for i in 0..n_demand {
-        let mut row = vec![0.0; n_vars];
-        row[w_idx] = -1.0; // -W
-        for j in 0..n_fac {
-            row[x_start + i * n_fac + j] = cost_matrix[[i, j]];
-        }
-        constraint_matrix.push(row);
-        constraint_rhs.push(0.0);
-        constraint_sense.push('<');
-    }
 
     // Compute max distance for upper bound
     let mut max_dist: f64 = 0.0;
@@ -84,62 +22,112 @@ pub fn solve(cost_matrix: RMatrix<f64>, n_facilities: usize) -> List {
         }
     }
 
-    // Variable types
-    let mut var_types = vec!['C'; n_vars];
-    for j in 0..n_fac {
-        var_types[y_start + j] = 'B'; // y binary
+    // Create row-based problem
+    let mut pb = RowProblem::new();
+
+    // Variables:
+    // W = maximum distance (continuous), objective coefficient = 1
+    let w_col = pb.add_column(1.0, 0.0..=(max_dist * 2.0));
+
+    // y[j] = 1 if facility j selected (binary)
+    let y_cols: Vec<Col> = (0..n_fac)
+        .map(|_| pb.add_integer_column(0.0, 0.0..=1.0))
+        .collect();
+
+    // x[i][j] = 1 if demand i assigned to facility j (continuous for LP relaxation)
+    let mut x_cols: Vec<Vec<Col>> = Vec::with_capacity(n_demand);
+    for _ in 0..n_demand {
+        let row_cols: Vec<Col> = (0..n_fac)
+            .map(|_| pb.add_column(0.0, 0.0..=1.0))
+            .collect();
+        x_cols.push(row_cols);
     }
 
-    let lb = vec![0.0; n_vars];
-    let mut ub = vec![1.0; n_vars];
-    ub[w_idx] = max_dist * 2.0;
+    // Constraint 1: sum_j y[j] = p
+    {
+        let terms: Vec<(Col, f64)> = y_cols.iter().map(|&c| (c, 1.0)).collect();
+        pb.add_row(p as f64..=p as f64, terms);
+    }
+
+    // Constraint 2: sum_j x[i][j] = 1 for all i
+    for i in 0..n_demand {
+        let terms: Vec<(Col, f64)> = x_cols[i].iter().map(|&c| (c, 1.0)).collect();
+        pb.add_row(1.0..=1.0, terms);
+    }
+
+    // Constraint 3: x[i][j] <= y[j] for all i,j
+    // Sparse: only 2 non-zeros per constraint
+    for i in 0..n_demand {
+        for j in 0..n_fac {
+            let terms = vec![(x_cols[i][j], 1.0), (y_cols[j], -1.0)];
+            pb.add_row(..=0.0, terms);
+        }
+    }
+
+    // Constraint 4: W >= sum_j (d[i][j] * x[i][j]) for all i (minmax constraint)
+    // Rewritten: sum_j (d[i][j] * x[i][j]) - W <= 0
+    for i in 0..n_demand {
+        let mut terms: Vec<(Col, f64)> = x_cols[i]
+            .iter()
+            .enumerate()
+            .map(|(j, &c)| (c, cost_matrix[[i, j]]))
+            .collect();
+        terms.push((w_col, -1.0));
+        pb.add_row(..=0.0, terms);
+    }
 
     // Solve
-    let result = solve_mip(
-        &obj_coeffs,
-        &constraint_matrix,
-        &constraint_rhs,
-        &constraint_sense,
-        &var_types,
-        &lb,
-        &ub,
-        false,
-    );
+    let solved = pb.optimise(Sense::Minimise).solve();
+    let status = solved.status();
 
-    // Extract results
-    let selected: Vec<i32> = result
-        .solution
-        .iter()
-        .skip(y_start)
-        .take(n_fac)
-        .enumerate()
-        .filter(|(_, &v)| v > 0.5)
-        .map(|(i, _)| (i + 1) as i32)
-        .collect();
+    match status {
+        HighsModelStatus::Optimal | HighsModelStatus::ModelEmpty => {
+            let sol = solved.get_solution();
 
-    let assignments: Vec<i32> = (0..n_demand)
-        .map(|i| {
-            let mut best_j = 0;
-            let mut best_val = 0.0;
-            for j in 0..n_fac {
-                let x_idx = x_start + i * n_fac + j;
-                if result.solution[x_idx] > best_val {
-                    best_val = result.solution[x_idx];
-                    best_j = j;
-                }
-            }
-            (best_j + 1) as i32
-        })
-        .collect();
+            // Extract selected facilities (1-based for R)
+            let selected: Vec<i32> = y_cols
+                .iter()
+                .enumerate()
+                .filter(|(_, &c)| sol[c] > 0.5)
+                .map(|(i, _)| (i + 1) as i32)
+                .collect();
 
-    let max_distance = result.solution[w_idx];
-    let n_selected = selected.len() as i32;
+            // Extract assignments
+            let assignments: Vec<i32> = (0..n_demand)
+                .map(|i| {
+                    let mut best_j = 0;
+                    let mut best_val = 0.0;
+                    for j in 0..n_fac {
+                        let val = sol[x_cols[i][j]];
+                        if val > best_val {
+                            best_val = val;
+                            best_j = j;
+                        }
+                    }
+                    (best_j + 1) as i32
+                })
+                .collect();
 
-    list!(
-        selected = selected,
-        assignments = assignments,
-        n_selected = n_selected,
-        objective = result.objective,
-        max_distance = max_distance
-    )
+            let max_distance = sol[w_col];
+            let n_selected = selected.len() as i32;
+
+            list!(
+                selected = selected,
+                assignments = assignments,
+                n_selected = n_selected,
+                objective = solved.objective_value(),
+                max_distance = max_distance
+            )
+        }
+        _ => {
+            eprintln!("P-Center solver returned non-optimal status: {:?}", status);
+            list!(
+                selected = Vec::<i32>::new(),
+                assignments = vec![0i32; n_demand],
+                n_selected = 0i32,
+                objective = f64::NAN,
+                max_distance = f64::NAN
+            )
+        }
+    }
 }

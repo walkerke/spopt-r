@@ -29,7 +29,7 @@
 #'   }
 #'
 #' @details
-#' SPENC (Wolf, 2020) extends spectral clustering to incorporate spatial
+#' SPENC (Wolf, 2021) extends spectral clustering to incorporate spatial
 #' constraints. The algorithm:
 #'
 #' 1. Computes attribute affinity using an RBF (Gaussian) kernel
@@ -65,8 +65,10 @@
 #' }
 #'
 #' @references
-#' Wolf, L.J. (2020). Spatially-encouraged spectral clustering: a technique
-#' for blending map typologies and regionalization. OSF Preprints.
+#' Wolf, L. J. (2021). Spatially-encouraged spectral clustering: a technique
+#' for blending map typologies and regionalization. International Journal of
+#' Geographical Information Science, 35(11), 2356-2373.
+#' \doi{10.1080/13658816.2021.1934475}
 #'
 #' @export
 spenc <- function(data,

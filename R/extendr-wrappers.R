@@ -89,8 +89,8 @@ rust_ward_constrained <- function(attrs, n_regions, adj_i, adj_j) {
 
 #' Solve Max-P regionalization problem (Rust)
 #' @keywords internal
-rust_max_p <- function(attrs, threshold_var, threshold, adj_i, adj_j, n_iterations, n_sa_iterations, cooling_rate, tabu_length, seed) {
-  .Call("wrap__rust_max_p", attrs, threshold_var, threshold, adj_i, adj_j, n_iterations, n_sa_iterations, cooling_rate, tabu_length, seed, PACKAGE = "spopt")
+rust_max_p <- function(attrs, threshold_var, threshold, adj_i, adj_j, n_iterations, n_sa_iterations, cooling_rate, tabu_length, seed, centroids_x, centroids_y, compact, compact_weight) {
+  .Call("wrap__rust_max_p", attrs, threshold_var, threshold, adj_i, adj_j, n_iterations, n_sa_iterations, cooling_rate, tabu_length, seed, centroids_x, centroids_y, compact, compact_weight, PACKAGE = "spopt")
 }
 
 #' Solve FRLM using greedy heuristic (Rust)

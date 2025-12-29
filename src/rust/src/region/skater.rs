@@ -186,7 +186,7 @@ fn compute_components_after_cut(
 
     let mut result = vec![0i32; n];
     for i in 0..n {
-        let root = find(&mut parent.clone(), i);
+        let root = find(&mut parent, i);
         let label = *label_map.entry(root).or_insert_with(|| {
             let l = next_label;
             next_label += 1;

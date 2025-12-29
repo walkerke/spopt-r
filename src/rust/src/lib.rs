@@ -295,7 +295,11 @@ fn rust_azp(
 /// @param cooling_rate SA cooling rate (e.g., 0.99)
 /// @param tabu_length Tabu list length for SA
 /// @param seed Random seed
-/// @return List with labels (1-based), n_regions, and objective
+/// @param centroids_x X coordinates of unit centroids (for compactness)
+/// @param centroids_y Y coordinates of unit centroids (for compactness)
+/// @param compact Whether to optimize for compactness
+/// @param compact_weight Weight for compactness vs dissimilarity (0-1)
+/// @return List with labels (1-based), n_regions, objective, and compactness
 /// @export
 #[extendr]
 fn rust_max_p(
@@ -309,6 +313,10 @@ fn rust_max_p(
     cooling_rate: f64,
     tabu_length: i32,
     seed: Nullable<i64>,
+    centroids_x: Nullable<Vec<f64>>,
+    centroids_y: Nullable<Vec<f64>>,
+    compact: bool,
+    compact_weight: f64,
 ) -> List {
     region::maxp::solve(
         attrs,
@@ -321,6 +329,10 @@ fn rust_max_p(
         cooling_rate,
         tabu_length as usize,
         seed.into_option().map(|s| s as u64),
+        centroids_x.into_option(),
+        centroids_y.into_option(),
+        compact,
+        compact_weight,
     )
 }
 

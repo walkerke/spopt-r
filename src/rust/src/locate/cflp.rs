@@ -4,7 +4,7 @@
 //! Supports either fixed number of facilities (p) or facility opening costs.
 
 use extendr_api::prelude::*;
-use crate::locate::solver::solve_mip;
+use highs::{HighsModelStatus, Sense, RowProblem, Col};
 
 /// Solve Capacitated Facility Location Problem
 ///
@@ -41,197 +41,152 @@ pub fn solve(
         );
     }
 
+    // Create row-based problem
+    let mut pb = RowProblem::new();
+
     // Variables:
-    // y[j] = 1 if facility j is selected (j = 0..n_fac-1)
-    // x[i][j] = fraction of demand i served by facility j (flattened)
-    let n_y = n_fac;
-    let n_x = n_demand * n_fac;
-    let n_vars = n_y + n_x;
+    // y[j] = 1 if facility j is selected (binary)
+    let y_cols: Vec<Col> = (0..n_fac)
+        .map(|j| {
+            let obj_coeff = facility_costs.map_or(0.0, |c| c[j]);
+            pb.add_integer_column(obj_coeff, 0.0..=1.0)
+        })
+        .collect();
 
-    // Objective: minimize sum_i sum_j (weight[i] * cost[i][j] * x[i][j])
-    // Plus facility costs if provided
-    let mut obj_coeffs = vec![0.0; n_vars];
-
-    // Facility opening costs (if provided)
-    if let Some(costs) = facility_costs {
-        for j in 0..n_fac {
-            obj_coeffs[j] = costs[j];
-        }
-    }
-
-    // Transportation costs
+    // x[i][j] = fraction of demand i served by facility j (continuous)
+    let mut x_cols: Vec<Vec<Col>> = Vec::with_capacity(n_demand);
     for i in 0..n_demand {
-        for j in 0..n_fac {
-            let x_idx = n_y + i * n_fac + j;
-            obj_coeffs[x_idx] = weights[i] * cost_matrix[[i, j]];
-        }
+        let row_cols: Vec<Col> = (0..n_fac)
+            .map(|j| {
+                let obj_coeff = weights[i] * cost_matrix[[i, j]];
+                pb.add_column(obj_coeff, 0.0..=1.0)
+            })
+            .collect();
+        x_cols.push(row_cols);
     }
 
-    // Constraints
-    let mut constraint_matrix: Vec<Vec<f64>> = Vec::new();
-    let mut constraint_rhs: Vec<f64> = Vec::new();
-    let mut constraint_sense: Vec<char> = Vec::new();
-
-    // 1. If n_facilities specified: sum_j y[j] = p
+    // Constraint 1: If n_facilities specified: sum_j y[j] = p
     if n_facilities > 0 {
-        let mut c1 = vec![0.0; n_vars];
-        for j in 0..n_fac {
-            c1[j] = 1.0;
-        }
-        constraint_matrix.push(c1);
-        constraint_rhs.push(n_facilities as f64);
-        constraint_sense.push('=');
+        let terms: Vec<(Col, f64)> = y_cols.iter().map(|&c| (c, 1.0)).collect();
+        pb.add_row(n_facilities as f64..=n_facilities as f64, terms);
     }
 
-    // 2. sum_j x[i][j] = 1 for all i (each demand fully served)
+    // Constraint 2: sum_j x[i][j] = 1 for all i (each demand fully served)
     for i in 0..n_demand {
-        let mut row = vec![0.0; n_vars];
-        for j in 0..n_fac {
-            row[n_y + i * n_fac + j] = 1.0;
-        }
-        constraint_matrix.push(row);
-        constraint_rhs.push(1.0);
-        constraint_sense.push('=');
+        let terms: Vec<(Col, f64)> = x_cols[i].iter().map(|&c| (c, 1.0)).collect();
+        pb.add_row(1.0..=1.0, terms);
     }
 
-    // 3. x[i][j] <= y[j] for all i,j (can only assign to open facility)
+    // Constraint 3: x[i][j] <= y[j] for all i,j (can only assign to open facility)
+    // Sparse: only 2 non-zeros per constraint
     for i in 0..n_demand {
         for j in 0..n_fac {
-            let mut row = vec![0.0; n_vars];
-            row[n_y + i * n_fac + j] = 1.0;  // x[i][j]
-            row[j] = -1.0;                    // -y[j]
-            constraint_matrix.push(row);
-            constraint_rhs.push(0.0);
-            constraint_sense.push('<');
+            let terms = vec![(x_cols[i][j], 1.0), (y_cols[j], -1.0)];
+            pb.add_row(..=0.0, terms);
         }
     }
 
-    // 4. CAPACITY: sum_i (weight[i] * x[i][j]) <= capacity[j] * y[j] for all j
+    // Constraint 4: CAPACITY: sum_i (weight[i] * x[i][j]) <= capacity[j] * y[j] for all j
     // Rewritten: sum_i (weight[i] * x[i][j]) - capacity[j] * y[j] <= 0
     for j in 0..n_fac {
-        let mut row = vec![0.0; n_vars];
-        row[j] = -capacities[j];  // -capacity[j] * y[j]
-        for i in 0..n_demand {
-            row[n_y + i * n_fac + j] = weights[i];  // weight[i] * x[i][j]
-        }
-        constraint_matrix.push(row);
-        constraint_rhs.push(0.0);
-        constraint_sense.push('<');
+        let mut terms: Vec<(Col, f64)> = (0..n_demand)
+            .map(|i| (x_cols[i][j], weights[i]))
+            .collect();
+        terms.push((y_cols[j], -capacities[j]));
+        pb.add_row(..=0.0, terms);
     }
-
-    // Variable types: y[j] binary, x[i][j] continuous
-    let mut var_types = vec!['B'; n_vars];
-    for i in n_y..n_vars {
-        var_types[i] = 'C';
-    }
-
-    let lb = vec![0.0; n_vars];
-    let ub = vec![1.0; n_vars];
 
     // Solve
-    let result = solve_mip(
-        &obj_coeffs,
-        &constraint_matrix,
-        &constraint_rhs,
-        &constraint_sense,
-        &var_types,
-        &lb,
-        &ub,
-        false, // minimize
-    );
+    let solved = pb.optimise(Sense::Minimise).solve();
+    let status = solved.status();
+    let status_str = format!("{:?}", status);
 
-    // Check if solution is valid
-    let status_str = format!("{:?}", result.status);
-    if !status_str.contains("Optimal") {
-        return list!(
-            error = format!("Solver returned non-optimal status: {}", status_str),
-            status = status_str
-        );
-    }
+    match status {
+        HighsModelStatus::Optimal | HighsModelStatus::ModelEmpty => {
+            let sol = solved.get_solution();
 
-    // Extract selected facilities (1-based for R)
-    let selected: Vec<i32> = result
-        .solution
-        .iter()
-        .take(n_fac)
-        .enumerate()
-        .filter(|(_, &v)| v > 0.5)
-        .map(|(i, _)| (i + 1) as i32)
-        .collect();
+            // Extract selected facilities (1-based for R)
+            let selected: Vec<i32> = y_cols
+                .iter()
+                .enumerate()
+                .filter(|(_, &c)| sol[c] > 0.5)
+                .map(|(i, _)| (i + 1) as i32)
+                .collect();
 
-    // Extract assignments - for CFLP, demand can be split across facilities
-    // Return primary assignment (facility serving most of demand i)
-    let assignments: Vec<i32> = (0..n_demand)
-        .map(|i| {
-            let mut best_j = 0;
-            let mut best_val = 0.0;
-            for j in 0..n_fac {
-                let x_idx = n_y + i * n_fac + j;
-                if result.solution[x_idx] > best_val {
-                    best_val = result.solution[x_idx];
-                    best_j = j;
+            // Extract assignments - return primary assignment (facility serving most of demand i)
+            let assignments: Vec<i32> = (0..n_demand)
+                .map(|i| {
+                    let mut best_j = 0;
+                    let mut best_val = 0.0;
+                    for j in 0..n_fac {
+                        let val = sol[x_cols[i][j]];
+                        if val > best_val {
+                            best_val = val;
+                            best_j = j;
+                        }
+                    }
+                    (best_j + 1) as i32
+                })
+                .collect();
+
+            // Extract allocation fractions for split demands
+            let mut allocation_fractions: Vec<f64> = Vec::with_capacity(n_demand * n_fac);
+            for i in 0..n_demand {
+                for j in 0..n_fac {
+                    allocation_fractions.push(sol[x_cols[i][j]]);
                 }
             }
-            (best_j + 1) as i32 // 1-based
-        })
-        .collect();
 
-    // Extract allocation fractions for split demands
-    let mut allocation_fractions: Vec<f64> = Vec::with_capacity(n_demand * n_fac);
-    for i in 0..n_demand {
-        for j in 0..n_fac {
-            let x_idx = n_y + i * n_fac + j;
-            allocation_fractions.push(result.solution[x_idx]);
-        }
-    }
+            // Check if any demand is split (allocation < 1 to primary)
+            let n_split: i32 = (0..n_demand)
+                .filter(|&i| {
+                    let assigned_j = (assignments[i] - 1) as usize;
+                    sol[x_cols[i][assigned_j]] < 0.999
+                })
+                .count() as i32;
 
-    // Check if any demand is split (allocation < 1 to primary)
-    let n_split: i32 = (0..n_demand)
-        .filter(|&i| {
-            let assigned_j = (assignments[i] - 1) as usize;
-            let x_idx = n_y + i * n_fac + assigned_j;
-            result.solution[x_idx] < 0.999
-        })
-        .count() as i32;
-
-    // Compute utilization of each facility
-    let mut utilizations: Vec<f64> = vec![0.0; n_fac];
-    for j in 0..n_fac {
-        if result.solution[j] > 0.5 {
-            let mut total_assigned = 0.0;
-            for i in 0..n_demand {
-                let x_idx = n_y + i * n_fac + j;
-                total_assigned += weights[i] * result.solution[x_idx];
-            }
-            utilizations[j] = total_assigned / capacities[j];
-        }
-    }
-
-    // Compute mean distance (weighted)
-    let total_weighted_dist: f64 = (0..n_demand)
-        .map(|i| {
-            let mut dist = 0.0;
+            // Compute utilization of each facility
+            let mut utilizations: Vec<f64> = vec![0.0; n_fac];
             for j in 0..n_fac {
-                let x_idx = n_y + i * n_fac + j;
-                dist += result.solution[x_idx] * cost_matrix[[i, j]];
+                if sol[y_cols[j]] > 0.5 {
+                    let total_assigned: f64 = (0..n_demand)
+                        .map(|i| weights[i] * sol[x_cols[i][j]])
+                        .sum();
+                    utilizations[j] = total_assigned / capacities[j];
+                }
             }
-            weights[i] * dist
-        })
-        .sum();
-    let total_weight: f64 = weights.iter().sum();
-    let mean_dist = total_weighted_dist / total_weight;
 
-    let n_selected = selected.len() as i32;
+            // Compute mean distance (weighted)
+            let total_weighted_dist: f64 = (0..n_demand)
+                .map(|i| {
+                    let dist: f64 = (0..n_fac)
+                        .map(|j| sol[x_cols[i][j]] * cost_matrix[[i, j]])
+                        .sum();
+                    weights[i] * dist
+                })
+                .sum();
+            let total_weight: f64 = weights.iter().sum();
+            let mean_dist = total_weighted_dist / total_weight;
 
-    list!(
-        selected = selected,
-        assignments = assignments,
-        allocation_matrix = allocation_fractions,
-        n_selected = n_selected,
-        n_split_demand = n_split,
-        objective = result.objective,
-        mean_distance = mean_dist,
-        utilizations = utilizations,
-        status = status_str
-    )
+            let n_selected = selected.len() as i32;
+
+            list!(
+                selected = selected,
+                assignments = assignments,
+                allocation_matrix = allocation_fractions,
+                n_selected = n_selected,
+                n_split_demand = n_split,
+                objective = solved.objective_value(),
+                mean_distance = mean_dist,
+                utilizations = utilizations,
+                status = status_str
+            )
+        }
+        _ => {
+            list!(
+                error = format!("Solver returned non-optimal status: {}", status_str),
+                status = status_str
+            )
+        }
+    }
 }
