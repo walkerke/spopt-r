@@ -103,6 +103,13 @@ azp <- function(data,
     stop("`n_regions` must be an integer >= 2", call. = FALSE)
   }
 
+  # Determine which columns to check for NAs
+  check_cols <- if (!is.null(attrs)) attrs else character(0)
+
+  # Validate data: remove empty geometries, check for NAs
+  validated <- validate_regionalization_data(data, check_cols, call_name = "azp")
+  data <- validated$data
+
   n <- nrow(data)
   if (n_regions >= n) {
     stop("`n_regions` must be less than number of observations", call. = FALSE)

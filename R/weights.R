@@ -41,14 +41,7 @@ sp_weights <- function(data, type = c("queen", "rook", "knn"), k = NULL, ...) {
   nb
 }
 
-#' Convert neighbor list to sparse adjacency matrix
-#'
-#' @param nb A neighbors list object (class "nb").
-#' @param style Weights style: "B" for binary, "W" for row-standardized.
-#'
-#' @return A sparse matrix (dgCMatrix).
-#'
-#' @keywords internal
+# Convert neighbor list to sparse adjacency matrix (internal)
 nb_to_sparse <- function(nb, style = "B") {
   n <- length(nb)
   lw <- spdep::nb2listw(nb, style = style, zero.policy = TRUE)

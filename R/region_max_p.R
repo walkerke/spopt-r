@@ -143,22 +143,29 @@ max_p_regions <- function(data,
     stop("`data` must be an sf object", call. = FALSE)
   }
 
-  n <- nrow(data)
-  if (n < 2) {
-    stop("Data must have at least 2 observations", call. = FALSE)
-  }
-
-  # Validate threshold variable
+  # Validate threshold variable exists before geometry check
   if (missing(threshold_var) || !is.character(threshold_var) || length(threshold_var) != 1) {
     stop("`threshold_var` must be a single column name", call. = FALSE)
   }
   if (!threshold_var %in% names(data)) {
     stop(paste0("Threshold variable '", threshold_var, "' not found in data"), call. = FALSE)
   }
-  threshold_values <- as.numeric(data[[threshold_var]])
-  if (any(is.na(threshold_values))) {
-    stop("Threshold variable contains NA values", call. = FALSE)
+
+  # Determine which columns to check for NAs
+  check_cols <- c(threshold_var, if (!is.null(attrs)) attrs else character(0))
+
+  # Validate data: remove empty geometries, check for NAs
+
+  validated <- validate_regionalization_data(data, check_cols, call_name = "max_p_regions")
+  data <- validated$data
+
+  n <- nrow(data)
+  if (n < 2) {
+    stop("Data must have at least 2 observations", call. = FALSE)
   }
+
+  # Extract threshold values (already validated for NAs)
+  threshold_values <- as.numeric(data[[threshold_var]])
 
   # Validate threshold
   if (!is.numeric(threshold) || length(threshold) != 1 || threshold <= 0) {
@@ -298,8 +305,7 @@ max_p_regions <- function(data,
   attach_spopt_metadata(result, metadata)
 }
 
-#' Compute region statistics
-#' @keywords internal
+# Compute region statistics (internal)
 compute_region_stats <- function(result, threshold_var, threshold) {
   # Compute stats for each region
   regions <- unique(result$.region)
@@ -316,12 +322,8 @@ compute_region_stats <- function(result, threshold_var, threshold) {
   do.call(rbind, lapply(stats, as.data.frame))
 }
 
-#' Compute Polsby-Popper compactness for regions
-#'
-#' The Polsby-Popper measure is: 4 * pi * Area / Perimeter^2
-#' Ranges from 0 to 1, where 1 is a perfect circle (most compact).
-#'
-#' @keywords internal
+# Compute Polsby-Popper compactness for regions (internal)
+# Polsby-Popper = 4 * pi * Area / Perimeter^2 (0-1, 1 = circle)
 compute_polsby_popper <- function(result) {
   regions <- sort(unique(result$.region))
   by_region <- numeric(length(regions))

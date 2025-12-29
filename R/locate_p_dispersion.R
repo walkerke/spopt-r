@@ -76,8 +76,7 @@ p_dispersion <- function(facilities,
   facilities_result
 }
 
-#' Greedy heuristic for p-dispersion
-#' @keywords internal
+# Greedy heuristic for p-dispersion (internal)
 greedy_p_dispersion <- function(cost_matrix, p) {
   n <- nrow(cost_matrix)
 

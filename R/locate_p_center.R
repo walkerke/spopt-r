@@ -113,8 +113,7 @@ p_center <- function(demand,
   output
 }
 
-#' Greedy heuristic for p-center
-#' @keywords internal
+# Greedy heuristic for p-center (internal)
 greedy_p_center <- function(cost_matrix, p) {
   n_demand <- nrow(cost_matrix)
   n_fac <- ncol(cost_matrix)

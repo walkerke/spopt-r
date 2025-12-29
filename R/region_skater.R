@@ -62,6 +62,16 @@ skater <- function(data,
     stop("`n_regions` must be an integer >= 2", call. = FALSE)
   }
 
+  # Determine which columns to check for NAs
+  check_cols <- c(
+    if (!is.null(attrs)) attrs else character(0),
+    if (!is.null(floor)) floor else character(0)
+  )
+
+  # Validate data: remove empty geometries, check for NAs
+  validated <- validate_regionalization_data(data, check_cols, call_name = "skater")
+  data <- validated$data
+
   n <- nrow(data)
   if (n_regions >= n) {
     stop("`n_regions` must be less than number of observations", call. = FALSE)
@@ -125,8 +135,7 @@ end_time <- Sys.time()
   attach_spopt_metadata(result, metadata)
 }
 
-#' Convert nb object to adjacency indices
-#' @keywords internal
+# Convert nb object to adjacency indices (internal)
 nb_to_adj_indices <- function(nb) {
   n <- length(nb)
   i <- integer(0)
@@ -143,8 +152,7 @@ nb_to_adj_indices <- function(nb) {
   list(i = i, j = j)
 }
 
-#' Compute total sum of squared deviations
-#' @keywords internal
+# Compute total sum of squared deviations (internal)
 compute_ssd <- function(attrs, labels) {
   unique_labels <- unique(labels)
   total_ssd <- 0

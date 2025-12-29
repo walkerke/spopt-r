@@ -1,28 +1,66 @@
-#' Attach spopt metadata to result
-#'
-#' @param result An sf object to attach metadata to.
-#' @param metadata A list of algorithm metadata.
-#'
-#' @return The sf object with "spopt" attribute attached.
-#'
-#' @keywords internal
+# Internal utility functions for spopt
+# These are not exported and not documented
+
+# Validate and clean sf data for regionalization
+# Removes empty geometries (with warning) and checks for NA values
+validate_regionalization_data <- function(data, check_cols, call_name = "regionalization") {
+
+  n_original <- nrow(data)
+  removed_idx <- integer(0)
+
+  # Check for empty geometries
+  empty_geom <- sf::st_is_empty(data)
+  if (any(empty_geom)) {
+    n_empty <- sum(empty_geom)
+    removed_idx <- which(empty_geom)
+    warning(
+      sprintf("%s: Removed %d observation(s) with empty geometries", call_name, n_empty),
+      call. = FALSE
+    )
+    data <- data[!empty_geom, ]
+  }
+
+  # Check for NA values in required columns
+  if (length(check_cols) > 0) {
+    existing_cols <- intersect(check_cols, names(data))
+
+    if (length(existing_cols) > 0) {
+      na_info <- lapply(existing_cols, function(col) {
+        which(is.na(data[[col]]))
+      })
+      names(na_info) <- existing_cols
+
+      cols_with_na <- existing_cols[sapply(na_info, length) > 0]
+
+      if (length(cols_with_na) > 0) {
+        na_counts <- sapply(na_info[cols_with_na], length)
+        col_summary <- paste(
+          sprintf("%s (%d)", cols_with_na, na_counts),
+          collapse = ", "
+        )
+        stop(
+          sprintf(
+            "%s: Found NA values in columns: %s\nPlease filter these rows or impute values before running %s()",
+            call_name, col_summary, call_name
+          ),
+          call. = FALSE
+        )
+      }
+    }
+  }
+
+  list(data = data, removed_idx = removed_idx)
+}
+
+# Attach spopt metadata to result
 attach_spopt_metadata <- function(result, metadata) {
   attr(result, "spopt") <- metadata
   result
 }
 
-#' Extract attribute columns from sf
-#'
-#' @param data An sf object.
-#' @param attrs A character vector of column names (e.g., `c("var1", "var2")`).
-#'   If NULL, uses all numeric columns.
-#'
-#' @return A numeric matrix of attribute values.
-#'
-#' @keywords internal
+# Extract attribute columns from sf object
 extract_attrs <- function(data, attrs) {
   if (is.null(attrs)) {
-    # Use all numeric columns except geometry
     geom_col <- attr(data, "sf_column")
     numeric_cols <- sapply(sf::st_drop_geometry(data), is.numeric)
     attr_names <- names(numeric_cols)[numeric_cols]
@@ -36,16 +74,13 @@ extract_attrs <- function(data, attrs) {
     stop("No attributes found for clustering", call. = FALSE)
   }
 
-  # Check all columns exist
   missing <- setdiff(attr_names, names(data))
   if (length(missing) > 0) {
     stop("Columns not found in data: ", paste(missing, collapse = ", "), call. = FALSE)
   }
 
-  # Extract and convert to matrix
   attr_df <- sf::st_drop_geometry(data)[, attr_names, drop = FALSE]
 
-  # Check all numeric
   non_numeric <- !sapply(attr_df, is.numeric)
   if (any(non_numeric)) {
     stop("Non-numeric columns: ", paste(names(non_numeric)[non_numeric], collapse = ", "),
@@ -55,14 +90,7 @@ extract_attrs <- function(data, attrs) {
   as.matrix(attr_df)
 }
 
-#' Validate and prepare spatial weights
-#'
-#' @param data An sf object.
-#' @param weights Either an nb object, or one of "queen", "rook".
-#'
-#' @return An nb object.
-#'
-#' @keywords internal
+# Validate and prepare spatial weights
 prepare_weights <- function(data, weights) {
   if (is.null(weights) || identical(weights, "queen")) {
     sp_weights(data, type = "queen")
