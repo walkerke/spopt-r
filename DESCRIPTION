@@ -1,6 +1,6 @@
 Package: spopt
 Title: Spatial Optimization
-Version: 0.0.0.9000
+Version: 0.1
 Date: 2025-12-29
 Authors@R: c(
     person("Kyle", "Walker", , "kyle@walker-data.com", role = c("aut", "cre")),

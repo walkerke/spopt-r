@@ -35,7 +35,7 @@ Spatial Optimization for R. An R-native implementation of spatial optimization a
 ```r
 # Install from GitHub
 # install.packages("pak")
-pak::pak("kylewalker/spopt-r")
+pak::pak("walkerke/spopt-r")
 ```
 
 ## Usage
