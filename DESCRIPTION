@@ -1,5 +1,5 @@
 Package: spopt
-Title: Spatial Optimization
+Title: Spatial Optimization for Regionalization, Facility Location, and Market Analysis
 Version: 0.1
 Date: 2025-12-29
 Authors@R: c(

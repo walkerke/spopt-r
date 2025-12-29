@@ -7,3 +7,4 @@
 ^src/rust/target$
 ^src/rust/\.cargo$
 ^src/rust/Cargo\.lock$
+^\.claude$
