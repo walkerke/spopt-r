@@ -21,8 +21,7 @@ RoxygenNote: 7.3.2
 Imports:
     sf,
     spdep,
-    Matrix,
-    methods
+    Matrix
 Suggests:
     testthat (>= 3.0.0),
     dodgr,
