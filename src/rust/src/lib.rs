@@ -183,6 +183,103 @@ fn rust_p_dispersion(
     locate::p_dispersion::solve(distance_matrix, n_facilities as usize)
 }
 
+/// Solve spatially-constrained Ward clustering
+///
+/// @param attrs Attribute matrix (n x p)
+/// @param n_regions Number of regions to create
+/// @param adj_i Row indices of adjacency (0-based)
+/// @param adj_j Column indices of adjacency (0-based)
+/// @return List with labels, n_regions, objective
+/// @export
+#[extendr]
+fn rust_ward_constrained(
+    attrs: RMatrix<f64>,
+    n_regions: i32,
+    adj_i: Vec<i32>,
+    adj_j: Vec<i32>,
+) -> List {
+    region::ward::solve(
+        attrs,
+        n_regions as usize,
+        &adj_i,
+        &adj_j,
+    )
+}
+
+/// Solve SPENC regionalization problem
+///
+/// Spatially-encouraged spectral clustering.
+///
+/// @param attrs Attribute matrix (n x p)
+/// @param n_regions Number of regions to create
+/// @param adj_i Row indices of adjacency (0-based)
+/// @param adj_j Column indices of adjacency (0-based)
+/// @param gamma RBF kernel parameter
+/// @param seed Random seed
+/// @return List with labels, n_regions, objective
+/// @export
+#[extendr]
+fn rust_spenc(
+    attrs: RMatrix<f64>,
+    n_regions: i32,
+    adj_i: Vec<i32>,
+    adj_j: Vec<i32>,
+    gamma: f64,
+    seed: Nullable<i64>,
+) -> List {
+    region::spenc::solve(
+        attrs,
+        n_regions as usize,
+        &adj_i,
+        &adj_j,
+        gamma,
+        seed.into_option().map(|s| s as u64),
+    )
+}
+
+/// Solve AZP regionalization problem
+///
+/// Automatic Zoning Procedure with basic, tabu, and SA variants.
+///
+/// @param attrs Attribute matrix (n x p)
+/// @param n_regions Number of regions to create
+/// @param adj_i Row indices of adjacency (0-based)
+/// @param adj_j Column indices of adjacency (0-based)
+/// @param method "basic", "tabu", or "sa"
+/// @param max_iterations Maximum iterations
+/// @param tabu_length Tabu list length (for tabu method)
+/// @param cooling_rate SA cooling rate (for sa method)
+/// @param initial_temperature SA initial temperature (for sa method)
+/// @param seed Random seed
+/// @return List with labels, n_regions, objective
+/// @export
+#[extendr]
+fn rust_azp(
+    attrs: RMatrix<f64>,
+    n_regions: i32,
+    adj_i: Vec<i32>,
+    adj_j: Vec<i32>,
+    method: &str,
+    max_iterations: i32,
+    tabu_length: i32,
+    cooling_rate: f64,
+    initial_temperature: f64,
+    seed: Nullable<i64>,
+) -> List {
+    region::azp::solve(
+        attrs,
+        n_regions as usize,
+        &adj_i,
+        &adj_j,
+        method,
+        max_iterations as usize,
+        tabu_length as usize,
+        cooling_rate,
+        initial_temperature,
+        seed.into_option().map(|s| s as u64),
+    )
+}
+
 /// Solve Max-P regionalization problem
 ///
 /// Maximize the number of regions such that each region satisfies a minimum
@@ -227,6 +324,93 @@ fn rust_max_p(
     )
 }
 
+/// Solve FRLM using greedy heuristic
+///
+/// @param n_candidates Number of candidate facility locations
+/// @param path_candidates Flat array of candidate indices for each path
+/// @param path_offsets Start index for each path in path_candidates
+/// @param path_distances Distances to each candidate along paths
+/// @param flow_volumes Volume of each flow
+/// @param vehicle_range Maximum vehicle range
+/// @param n_facilities Number of facilities to place
+/// @return List with selected facilities and coverage info
+/// @export
+#[extendr]
+fn rust_frlm_greedy(
+    n_candidates: i32,
+    path_candidates: Vec<i32>,
+    path_offsets: Vec<i32>,
+    path_distances: Vec<f64>,
+    flow_volumes: Vec<f64>,
+    vehicle_range: f64,
+    n_facilities: i32,
+) -> List {
+    locate::frlm::solve_greedy(
+        n_candidates as usize,
+        &path_candidates,
+        &path_offsets,
+        &path_distances,
+        &flow_volumes,
+        vehicle_range,
+        n_facilities as usize,
+    )
+}
+
+/// Solve Capacitated Facility Location Problem (CFLP)
+///
+/// Minimize weighted distance subject to facility capacity constraints.
+/// Supports fixed number of facilities or facility opening costs.
+///
+/// @param cost_matrix Cost/distance matrix (demand x facilities)
+/// @param weights Demand weights
+/// @param capacities Capacity of each facility
+/// @param n_facilities Number of facilities to locate (0 if using facility costs)
+/// @param facility_costs Optional fixed cost to open each facility
+/// @return List with selected facilities, assignments, utilizations
+/// @export
+#[extendr]
+fn rust_cflp(
+    cost_matrix: RMatrix<f64>,
+    weights: Vec<f64>,
+    capacities: Vec<f64>,
+    n_facilities: i32,
+    facility_costs: Nullable<Vec<f64>>,
+) -> List {
+    locate::cflp::solve(
+        cost_matrix,
+        &weights,
+        &capacities,
+        n_facilities as usize,
+        facility_costs.into_option().as_deref(),
+    )
+}
+
+/// Compute Huff Model probabilities
+///
+/// Computes probability surface based on distance decay and attractiveness.
+/// Formula: P_ij = (A_j × D_ij^β) / Σ_k(A_k × D_ik^β)
+///
+/// @param cost_matrix Cost/distance matrix (demand x stores)
+/// @param attractiveness Attractiveness values for each store (pre-computed with exponents)
+/// @param distance_exponent Distance decay exponent (typically negative, e.g., -1.5)
+/// @param sales_potential Optional sales potential for each demand point
+/// @return List with probabilities, market shares, expected sales
+/// @export
+#[extendr]
+fn rust_huff(
+    cost_matrix: RMatrix<f64>,
+    attractiveness: Vec<f64>,
+    distance_exponent: f64,
+    sales_potential: Nullable<Vec<f64>>,
+) -> List {
+    locate::huff::compute_probabilities(
+        cost_matrix,
+        &attractiveness,
+        distance_exponent,
+        sales_potential.into_option().as_deref(),
+    )
+}
+
 // Macro to generate exports
 extendr_module! {
     mod spopt;
@@ -236,10 +420,16 @@ extendr_module! {
     fn rust_is_connected;
     fn rust_connected_components;
     fn rust_skater;
+    fn rust_azp;
+    fn rust_spenc;
+    fn rust_ward_constrained;
     fn rust_max_p;
     fn rust_p_median;
     fn rust_lscp;
     fn rust_mclp;
     fn rust_p_center;
     fn rust_p_dispersion;
+    fn rust_frlm_greedy;
+    fn rust_cflp;
+    fn rust_huff;
 }

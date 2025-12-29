@@ -1,16 +1,19 @@
 Package: spopt
 Title: Spatial Optimization
 Version: 0.0.0.9000
+Date: 2025-12-29
 Authors@R: c(
     person("Kyle", "Walker", , "kyle@walker-data.com", role = c("aut", "cre")),
     person("PySAL Developers", role = "cph",
            comment = "Original Python spopt library")
   )
-Description: Spatial optimization algorithms for regionalization and facility
-    location problems. Includes algorithms for spatial clustering (Max-P,
-    AZP, SKATER, SPENC, Ward) and optimal facility siting (P-Median, P-Center,
-    MCLP, LSCP, P-Dispersion, FRLM). Uses a Rust backend via extendr for
-    performance and the HiGHS solver for mixed-integer programming.
+Description: Spatial optimization algorithms for regionalization, facility
+    location, and market analysis. Includes algorithms for spatial clustering
+    (Max-P, AZP, SKATER, SPENC, Ward), optimal facility siting (P-Median,
+    P-Center, MCLP, LSCP, CFLP, P-Dispersion, FRLM), and market share analysis
+    (Huff model). Supports network-based travel times via custom cost matrices.
+    Uses a Rust backend via 'extendr' for performance and the 'HiGHS' solver
+    for mixed-integer programming.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
@@ -22,9 +25,8 @@ Imports:
     methods
 Suggests:
     testthat (>= 3.0.0),
-    tmap,
-    ggplot2,
-    spData
+    dodgr,
+    r5r
 Config/testthat/edition: 3
 Config/rextendr/version: 0.3.1
 SystemRequirements: Cargo (Rust's package manager), rustc >= 1.70

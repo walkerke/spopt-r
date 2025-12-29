@@ -118,7 +118,7 @@ fn find_best_cut(
     let mut best_labels: Vec<i32> = Vec::new();
 
     // Build adjacency from current MST edges for component detection
-    for (edge_idx, &(from, to, _)) in edges.iter().enumerate() {
+    for (edge_idx, &(_from, _to, _)) in edges.iter().enumerate() {
         // Simulate cutting this edge
         let remaining_edges: Vec<_> = edges
             .iter()

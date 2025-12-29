@@ -3,11 +3,6 @@
 # This file was created with the following call:
 #   .Call("wrap__make_spopt_wrappers", use_symbols = TRUE, package_name = "spopt")
 
-#' @docType package
-#' @usage NULL
-#' @useDynLib spopt, .registration = TRUE
-NULL
-
 #' Compute Euclidean distance matrix (Rust)
 #' @keywords internal
 rust_distance_matrix_euclidean <- function(x1, y1, x2, y2) {
@@ -74,8 +69,44 @@ rust_p_dispersion <- function(distance_matrix, n_facilities) {
   .Call("wrap__rust_p_dispersion", distance_matrix, n_facilities, PACKAGE = "spopt")
 }
 
+#' Solve AZP regionalization problem (Rust)
+#' @keywords internal
+rust_azp <- function(attrs, n_regions, adj_i, adj_j, method, max_iterations, tabu_length, cooling_rate, initial_temperature, seed) {
+  .Call("wrap__rust_azp", attrs, n_regions, adj_i, adj_j, method, max_iterations, tabu_length, cooling_rate, initial_temperature, seed, PACKAGE = "spopt")
+}
+
+#' Solve SPENC regionalization problem (Rust)
+#' @keywords internal
+rust_spenc <- function(attrs, n_regions, adj_i, adj_j, gamma, seed) {
+  .Call("wrap__rust_spenc", attrs, n_regions, adj_i, adj_j, gamma, seed, PACKAGE = "spopt")
+}
+
+#' Solve spatially-constrained Ward clustering (Rust)
+#' @keywords internal
+rust_ward_constrained <- function(attrs, n_regions, adj_i, adj_j) {
+  .Call("wrap__rust_ward_constrained", attrs, n_regions, adj_i, adj_j, PACKAGE = "spopt")
+}
+
 #' Solve Max-P regionalization problem (Rust)
 #' @keywords internal
 rust_max_p <- function(attrs, threshold_var, threshold, adj_i, adj_j, n_iterations, n_sa_iterations, cooling_rate, tabu_length, seed) {
   .Call("wrap__rust_max_p", attrs, threshold_var, threshold, adj_i, adj_j, n_iterations, n_sa_iterations, cooling_rate, tabu_length, seed, PACKAGE = "spopt")
+}
+
+#' Solve FRLM using greedy heuristic (Rust)
+#' @keywords internal
+rust_frlm_greedy <- function(n_candidates, path_candidates, path_offsets, path_distances, flow_volumes, vehicle_range, n_facilities) {
+  .Call("wrap__rust_frlm_greedy", n_candidates, path_candidates, path_offsets, path_distances, flow_volumes, vehicle_range, n_facilities, PACKAGE = "spopt")
+}
+
+#' Solve CFLP (Capacitated Facility Location Problem) (Rust)
+#' @keywords internal
+rust_cflp <- function(cost_matrix, weights, capacities, n_facilities, facility_costs) {
+  .Call("wrap__rust_cflp", cost_matrix, weights, capacities, n_facilities, facility_costs, PACKAGE = "spopt")
+}
+
+#' Compute Huff Model probabilities (Rust)
+#' @keywords internal
+rust_huff <- function(cost_matrix, attractiveness, distance_exponent, sales_potential) {
+  .Call("wrap__rust_huff", cost_matrix, attractiveness, distance_exponent, sales_potential, PACKAGE = "spopt")
 }

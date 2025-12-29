@@ -169,7 +169,7 @@ pub fn solve(
             let mut worker_best_p = 0usize;
             let mut stable_count = 0usize;
 
-            for iter in 0..iterations_per_worker {
+            for _iter in 0..iterations_per_worker {
                 // Early termination: if we haven't improved in 50 iterations, stop
                 if stable_count > 50 {
                     break;
@@ -540,7 +540,7 @@ fn simulated_annealing(
     threshold_var: &[f64],
     threshold: f64,
     adj: &AdjList,
-    neighbor_distances: &HashMap<(usize, usize), f64>,
+    _neighbor_distances: &HashMap<(usize, usize), f64>,
     n_iterations: usize,
     cooling_rate: f64,
     tabu_length: usize,

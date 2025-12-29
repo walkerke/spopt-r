@@ -6,7 +6,7 @@ test_that("skater returns sf with .region column",
 
   nc <- sf::st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
 
-  result <- skater(nc, attrs = ~ SID74 + SID79, n_regions = 5)
+  result <- skater(nc, attrs = c("SID74", "SID79"), n_regions = 5)
 
   expect_s3_class(result, "sf")
   expect_true(".region" %in% names(result))
@@ -22,7 +22,7 @@ test_that("skater respects floor constraint", {
 
   result <- skater(
     nc,
-    attrs = ~ SID74 + SID79,
+    attrs = c("SID74", "SID79"),
     n_regions = 5,
     floor = "BIR74",
     floor_value = 50000

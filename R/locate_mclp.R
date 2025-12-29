@@ -66,6 +66,26 @@ mclp <- function(demand,
     cost_matrix <- distance_matrix(demand, facilities, type = distance_metric)
   }
 
+  # Validate cost matrix for NA/Inf values
+  if (any(is.na(cost_matrix))) {
+    n_na <- sum(is.na(cost_matrix))
+    warning(sprintf(
+      "cost_matrix contains %d NA values (unreachable points). Replacing with large value.",
+      n_na
+    ))
+    max_cost <- max(cost_matrix, na.rm = TRUE)
+    cost_matrix[is.na(cost_matrix)] <- max_cost * 100
+  }
+  if (any(is.infinite(cost_matrix))) {
+    n_inf <- sum(is.infinite(cost_matrix))
+    warning(sprintf(
+      "cost_matrix contains %d Inf values. Replacing with large value.",
+      n_inf
+    ))
+    finite_max <- max(cost_matrix[is.finite(cost_matrix)])
+    cost_matrix[is.infinite(cost_matrix)] <- finite_max * 100
+  }
+
   n_demand <- nrow(demand)
   n_fac <- nrow(facilities)
 

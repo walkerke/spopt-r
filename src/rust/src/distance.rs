@@ -79,6 +79,7 @@ pub fn manhattan_matrix(x1: &[f64], y1: &[f64], x2: &[f64], y2: &[f64]) -> RMatr
 }
 
 /// Compute pairwise attribute dissimilarity matrix
+#[allow(dead_code)]
 pub fn attribute_dissimilarity(attrs: &[Vec<f64>], metric: &str) -> Vec<Vec<f64>> {
     let n = attrs.len();
     let mut dissim = vec![vec![0.0; n]; n];

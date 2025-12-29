@@ -37,9 +37,9 @@ pub fn solve_mip(
     // Add variables with integrality specified at creation time
     // In highs 1.12+, integrality must be set when adding the column
     for i in 0..n_vars {
-        let obj = if maximize { -obj_coeffs[i] } else { obj_coeffs[i] };
+        // Use original coefficients - the sense (Maximise/Minimise) handles direction
         let is_integer = var_types[i] == 'B' || var_types[i] == 'I';
-        let col = pb.add_column_with_integrality(obj, lb[i]..=ub[i], is_integer);
+        let col = pb.add_column_with_integrality(obj_coeffs[i], lb[i]..=ub[i], is_integer);
         cols.push(col);
     }
 
@@ -76,21 +76,16 @@ pub fn solve_mip(
 
     // Extract results
     let status = solved.status();
-    let status_str = format!("{:?}", status);
+    let _status_str = format!("{:?}", status);
 
     match status {
         HighsModelStatus::Optimal | HighsModelStatus::ModelEmpty => {
             // Get solution and extract variable values
             let sol = solved.get_solution();
             let solution: Vec<f64> = cols.iter().map(|&c| sol[c]).collect();
-            let obj_val = if maximize {
-                -solved.objective_value()
-            } else {
-                solved.objective_value()
-            };
             SolveResult {
                 status,
-                objective: obj_val,
+                objective: solved.objective_value(),
                 solution,
             }
         }

@@ -6,8 +6,8 @@
 #' population or sample size requirements.
 #'
 #' @param data An sf object with polygon or point geometries.
-#' @param attrs A formula (e.g., `~ var1 + var2`) or character vector specifying
-#'   which columns to use for computing within-region dissimilarity. If NULL,
+#' @param attrs Character vector of column names to use for computing
+#'   within-region dissimilarity (e.g., `c("var1", "var2")`). If NULL,
 #'   uses all numeric columns.
 #' @param threshold_var Character. Name of the column containing the threshold
 #'   variable (e.g., population, income). Each region must have a sum of this
@@ -70,7 +70,7 @@
 #' # Create regions where each has at least 100,000 in BIR74
 #' result <- max_p_regions(
 #'   nc,
-#'   attrs = ~ SID74 + SID79,
+#'   attrs = c("SID74", "SID79"),
 #'   threshold_var = "BIR74",
 #'   threshold = 100000
 #' )

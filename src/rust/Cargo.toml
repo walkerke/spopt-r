@@ -15,6 +15,7 @@ petgraph = "0.6"
 
 # Numerical computing
 ndarray = { version = "0.16", features = ["rayon"] }
+nalgebra = "0.33"
 
 # Sparse matrices
 sprs = "0.11"

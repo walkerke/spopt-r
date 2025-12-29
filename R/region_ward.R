@@ -1,26 +1,43 @@
 #' Ward Spatial Clustering
 #'
-#' Performs spatially constrained hierarchical clustering using Ward's
-#' minimum variance method. Only spatially contiguous areas can be merged.
+#' Performs spatially-constrained hierarchical clustering using Ward's
+#' minimum variance method. Only spatially contiguous areas can be merged,
+#' ensuring all resulting regions are spatially connected.
 #'
 #' @param data An sf object with polygon or point geometries.
-#' @param attrs A formula (e.g., `~ var1 + var2`) or character vector specifying
-#'   which columns to use for clustering. If NULL, uses all numeric columns.
+#' @param attrs Character vector of column names to use for clustering
+#'   (e.g., `c("var1", "var2")`). If NULL, uses all numeric columns.
 #' @param n_regions Integer. Number of regions (clusters) to create.
 #' @param weights Spatial weights specification. One of "queen" (default),
 #'   "rook", or an nb object from spdep.
 #' @param scale Logical. If TRUE (default), standardize attributes before clustering.
+#' @param verbose Logical. Print progress messages.
 #'
 #' @return An sf object with a `.region` column containing cluster assignments.
 #'   Metadata is stored in the "spopt" attribute.
+#'
+#' @details
+#' This function implements spatially-constrained agglomerative hierarchical
+#' clustering using Ward's minimum variance criterion. Unlike standard Ward
+#' clustering, this version enforces spatial contiguity by only allowing
+#' clusters that share a border to be merged.
+#'
+#' The algorithm:
+#' 1. Starts with each observation as its own cluster
+#' 2. At each step, finds the pair of \strong{adjacent} clusters with minimum
+#'    Ward distance (increase in total within-cluster variance)
+#' 3. Merges them into a single cluster
+#' 4. Repeats until the desired number of regions is reached
+#'
+#' The result guarantees that all regions are spatially contiguous.
 #'
 #' @examples
 #' \dontrun{
 #' library(sf)
 #' nc <- st_read(system.file("shape/nc.shp", package = "sf"))
 #'
-#' # Cluster into 8 regions
-#' result <- ward_spatial(nc, attrs = ~ SID74 + SID79, n_regions = 8)
+#' # Cluster into 8 spatially-contiguous regions
+#' result <- ward_spatial(nc, attrs = c("SID74", "SID79"), n_regions = 8)
 #' plot(result[".region"])
 #' }
 #'
@@ -29,7 +46,8 @@ ward_spatial <- function(data,
                          attrs = NULL,
                          n_regions,
                          weights = "queen",
-                         scale = TRUE) {
+                         scale = TRUE,
+                         verbose = FALSE) {
   # Input validation
   if (!inherits(data, "sf")) {
     stop("`data` must be an sf object", call. = FALSE)
@@ -37,6 +55,11 @@ ward_spatial <- function(data,
 
   if (!is.numeric(n_regions) || n_regions < 2) {
     stop("`n_regions` must be an integer >= 2", call. = FALSE)
+  }
+
+  n <- nrow(data)
+  if (n_regions >= n) {
+    stop("`n_regions` must be less than number of observations", call. = FALSE)
   }
 
   # Extract attributes
@@ -49,40 +72,53 @@ ward_spatial <- function(data,
   # Prepare spatial weights
   nb <- prepare_weights(data, weights)
 
-  # Convert to sparse connectivity matrix for hclust
-  connectivity <- nb_to_sparse(nb, style = "B")
+  # Convert nb to adjacency indices
+  adj <- nb_to_adj_indices(nb)
 
+  if (verbose) {
+    message(sprintf(
+      "Ward Spatial: n=%d, n_regions=%d, attrs=%d",
+      n, n_regions, ncol(attr_matrix)
+    ))
+  }
+
+  # Call Rust implementation
   start_time <- Sys.time()
 
-  # Use stats::hclust with ward.D2 linkage
-  # First compute distance matrix
-  d <- stats::dist(attr_matrix)
-
-  # Use constrained hierarchical clustering
-  # Note: This uses the standard R implementation
-  # For true spatial constraint, we rely on the connectivity matrix
-  hc <- stats::hclust(d, method = "ward.D2")
-
-  # Cut tree to get clusters
-  labels <- stats::cutree(hc, k = n_regions)
+  result_list <- rust_ward_constrained(
+    attrs = attr_matrix,
+    n_regions = as.integer(n_regions),
+    adj_i = adj$i,
+    adj_j = adj$j
+  )
 
   end_time <- Sys.time()
+
+  # Extract results
+  labels <- result_list$labels
+  objective <- result_list$objective
+  actual_n_regions <- result_list$n_regions
 
   # Attach results to sf object
   result <- data
   result$.region <- as.integer(labels)
 
-  # Compute objective
-  objective <- compute_ssd(attr_matrix, labels)
+  if (verbose) {
+    message(sprintf(
+      "  Result: %d regions, objective=%.4f, time=%.3fs",
+      actual_n_regions, objective,
+      as.numeric(difftime(end_time, start_time, units = "secs"))
+    ))
+  }
 
   # Attach metadata
   metadata <- list(
     algorithm = "ward_spatial",
-    n_regions = length(unique(labels)),
+    n_regions = actual_n_regions,
     objective = objective,
     solve_time = as.numeric(difftime(end_time, start_time, units = "secs")),
     scaled = scale,
-    note = "Uses standard Ward clustering; spatial constraint not enforced in this version"
+    contiguity_enforced = TRUE
   )
 
   attach_spopt_metadata(result, metadata)

@@ -11,10 +11,11 @@ attach_spopt_metadata <- function(result, metadata) {
   result
 }
 
-#' Extract attribute columns from sf using formula
+#' Extract attribute columns from sf
 #'
 #' @param data An sf object.
-#' @param attrs A formula like ~ var1 + var2, or a character vector of column names.
+#' @param attrs A character vector of column names (e.g., `c("var1", "var2")`).
+#'   If NULL, uses all numeric columns.
 #'
 #' @return A numeric matrix of attribute values.
 #'
@@ -25,12 +26,10 @@ extract_attrs <- function(data, attrs) {
     geom_col <- attr(data, "sf_column")
     numeric_cols <- sapply(sf::st_drop_geometry(data), is.numeric)
     attr_names <- names(numeric_cols)[numeric_cols]
-  } else if (inherits(attrs, "formula")) {
-    attr_names <- all.vars(attrs)
   } else if (is.character(attrs)) {
     attr_names <- attrs
   } else {
-    stop("`attrs` must be a formula, character vector, or NULL", call. = FALSE)
+    stop("`attrs` must be a character vector of column names", call. = FALSE)
   }
 
   if (length(attr_names) == 0) {

@@ -6,8 +6,8 @@
 #' to create spatially contiguous clusters.
 #'
 #' @param data An sf object with polygon or point geometries.
-#' @param attrs A formula (e.g., `~ var1 + var2`) or character vector specifying
-#'   which columns to use for clustering. If NULL, uses all numeric columns.
+#' @param attrs Character vector of column names to use for clustering
+#'   (e.g., `c("var1", "var2")`). If NULL, uses all numeric columns.
 #' @param n_regions Integer. Number of regions (clusters) to create.
 #' @param weights Spatial weights specification. One of "queen" (default),
 #'   "rook", or an nb object from spdep.
@@ -22,15 +22,15 @@
 #'   Metadata is stored in the "spopt" attribute.
 #'
 #' @examples
-#' \dontrun
+#' \dontrun{
 #' library(sf)
 #' nc <- st_read(system.file("shape/nc.shp", package = "sf"))
 #'
 #' # Cluster into 5 regions based on SIDS rates
-#' result <- skater(nc, attrs = ~ SID74 + SID79, n_regions = 5)
+#' result <- skater(nc, attrs = c("SID74", "SID79"), n_regions = 5)
 #'
 #' # With floor constraint: each region must have at least 100,000 births
-#' result <- skater(nc, attrs = ~ SID74 + SID79, n_regions = 5,
+#' result <- skater(nc, attrs = c("SID74", "SID79"), n_regions = 5,
 #'                  floor = "BIR74", floor_value = 100000)
 #'
 #' # View results

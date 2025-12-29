@@ -34,10 +34,9 @@ cat("   SUCCESS\n\n")
 # --- Regionalization ---
 
 cat("3. Testing skater() - SKATER regionalization...\n")
-# Using NC data with SIDS rates
 result_skater <- skater(
   nc,
-  attrs = ~ SID74 + SID79,
+  attrs = c("SID74", "SID79"),
   n_regions = 8,
   seed = 42
 )
@@ -46,20 +45,21 @@ cat("   Regions created:", length(unique(result_skater$.region)), "\n")
 cat("   Metadata available:", !is.null(attr(result_skater, "spopt")), "\n")
 cat("   SUCCESS\n\n")
 
-cat("4. Testing ward_spatial() - Ward clustering...\n")
+cat("4. Testing ward_spatial() - Spatially-constrained Ward clustering...\n")
 result_ward <- ward_spatial(
   nc,
-  attrs = ~ SID74 + SID79,
+  attrs = c("SID74", "SID79"),
   n_regions = 8
 )
 cat("   Result class:", paste(class(result_ward), collapse = ", "), "\n")
 cat("   Regions created:", length(unique(result_ward$.region)), "\n")
+cat("   Contiguity enforced:", attr(result_ward, "spopt")$contiguity_enforced, "\n")
 cat("   SUCCESS\n\n")
 
 cat("5. Testing max_p_regions() - Maximize regions with threshold constraint...\n")
 result_maxp <- max_p_regions(
   nc,
-  attrs = ~ SID74 + SID79,
+  attrs = c("SID74", "SID79"),
   threshold_var = "BIR74",
   threshold = 50000,
   n_iterations = 100,
@@ -70,17 +70,43 @@ meta_maxp <- attr(result_maxp, "spopt")
 cat("   Regions created:", meta_maxp$n_regions, "\n")
 cat("   Objective (within-region SSD):", round(meta_maxp$objective, 2), "\n")
 cat("   Solve time:", round(meta_maxp$solve_time, 4), "seconds\n")
-
-# Verify all regions meet threshold
 all_meet <- all(sapply(unique(result_maxp$.region), function(r) {
   sum(nc$BIR74[result_maxp$.region == r]) >= 50000
 }))
 cat("   All regions meet threshold:", all_meet, "\n")
 cat("   SUCCESS\n\n")
 
+cat("6. Testing azp() - Automatic Zoning Procedure...\n")
+result_azp <- azp(
+  nc,
+  attrs = c("SID74", "SID79"),
+  n_regions = 8,
+  method = "tabu",
+  seed = 42
+)
+meta_azp <- attr(result_azp, "spopt")
+cat("   Method:", meta_azp$method, "\n")
+cat("   Regions created:", meta_azp$n_regions, "\n")
+cat("   Objective:", round(meta_azp$objective, 4), "\n")
+cat("   SUCCESS\n\n")
+
+cat("7. Testing spenc() - Spatially-encouraged spectral clustering...\n")
+result_spenc <- spenc(
+  nc,
+  attrs = c("SID74", "SID79"),
+  n_regions = 8,
+  gamma = 1.0,
+  seed = 42
+)
+meta_spenc <- attr(result_spenc, "spopt")
+cat("   Regions created:", meta_spenc$n_regions, "\n")
+cat("   Gamma:", meta_spenc$gamma, "\n")
+cat("   Objective:", round(meta_spenc$objective, 4), "\n")
+cat("   SUCCESS\n\n")
+
 # --- Facility Location ---
 
-cat("6. Testing lscp() - Location Set Covering...\n")
+cat("8. Testing lscp() - Location Set Covering...\n")
 set.seed(42)
 demand <- st_as_sf(
   data.frame(x = runif(30), y = runif(30)),
@@ -91,12 +117,12 @@ facilities <- st_as_sf(
   coords = c("x", "y")
 )
 
-result_lscp <- lscp(demand, facilities, service_radius = 0.4)
+result_lscp <- lscp(demand, facilities, service_radius = 0.6)
 cat("   Facilities selected:", sum(result_lscp$facilities$.selected), "\n")
 cat("   Coverage:", round(attr(result_lscp, "spopt")$coverage_pct, 1), "%\n")
 cat("   SUCCESS\n\n")
 
-cat("7. Testing mclp() - Maximum Coverage Location...\n")
+cat("9. Testing mclp() - Maximum Coverage Location...\n")
 demand$population <- rpois(30, 500)
 result_mclp <- mclp(
   demand, facilities,
@@ -108,7 +134,7 @@ cat("   Facilities selected:", sum(result_mclp$facilities$.selected), "\n")
 cat("   Coverage:", round(attr(result_mclp, "spopt")$coverage_pct, 1), "%\n")
 cat("   SUCCESS\n\n")
 
-cat("8. Testing p_median() - Minimize total weighted distance...\n")
+cat("10. Testing p_median() - Minimize total weighted distance...\n")
 result_pmedian <- p_median(
   demand, facilities,
   n_facilities = 4,
@@ -119,7 +145,7 @@ cat("   Mean distance:", round(attr(result_pmedian, "spopt")$mean_distance, 4), 
 cat("   All demand assigned:", all(!is.na(result_pmedian$demand$.facility)), "\n")
 cat("   SUCCESS\n\n")
 
-cat("9. Testing p_center() - Minimize maximum distance...\n")
+cat("11. Testing p_center() - Minimize maximum distance...\n")
 result_pcenter <- p_center(
   demand, facilities,
   n_facilities = 4
@@ -128,13 +154,41 @@ cat("   Facilities selected:", sum(result_pcenter$facilities$.selected), "\n")
 cat("   Max distance:", round(attr(result_pcenter, "spopt")$max_distance, 4), "\n")
 cat("   SUCCESS\n\n")
 
-cat("10. Testing p_dispersion() - Maximize facility spread...\n")
+cat("12. Testing p_dispersion() - Maximize facility spread...\n")
 result_pdisp <- p_dispersion(
   facilities,
   n_facilities = 4
 )
 cat("   Facilities selected:", sum(result_pdisp$.selected), "\n")
 cat("   Min inter-facility distance:", round(attr(result_pdisp, "spopt")$min_distance, 4), "\n")
+cat("   SUCCESS\n\n")
+
+cat("13. Testing frlm() - Flow Refueling Location Model...\n")
+# Create candidate locations along a line
+set.seed(42)
+frlm_candidates <- st_as_sf(data.frame(
+  id = 1:20,
+  x = seq(0, 100, length.out = 20),
+  y = runif(20, -5, 5)
+), coords = c("x", "y"))
+
+# Create flows (trips between endpoints)
+frlm_flows <- data.frame(
+  origin = c(1, 1, 5, 3),
+  destination = c(20, 15, 18, 17),
+  volume = c(100, 200, 150, 300)
+)
+
+result_frlm <- frlm(
+  flows = frlm_flows,
+  candidates = frlm_candidates,
+  vehicle_range = 40,
+  n_facilities = 3,
+  verbose = FALSE
+)
+meta_frlm <- attr(result_frlm, "spopt")
+cat("   Facilities selected:", meta_frlm$n_facilities, "\n")
+cat("   Coverage:", round(meta_frlm$coverage_pct, 1), "%\n")
 cat("   SUCCESS\n\n")
 
 # -----------------------------------------------------------------------------
@@ -149,7 +203,7 @@ for (thresh in thresholds) {
   start <- Sys.time()
   result <- max_p_regions(
     nc,
-    attrs = ~ SID74 + SID79,
+    attrs = c("SID74", "SID79"),
     threshold_var = "BIR74",
     threshold = thresh,
     n_iterations = 100,
@@ -157,14 +211,37 @@ for (thresh in thresholds) {
   )
   elapsed <- as.numeric(Sys.time() - start, units = "secs")
   n_regions <- attr(result, "spopt")$n_regions
-
-  # Verify threshold constraint
   all_meet <- all(sapply(unique(result$.region), function(r) {
     sum(nc$BIR74[result$.region == r]) >= thresh
   }))
-
   cat(sprintf("   threshold=%6.0f: %2d regions, valid=%s, time=%.3fs\n",
       thresh, n_regions, all_meet, elapsed))
+}
+
+# -----------------------------------------------------------------------------
+# REGIONALIZATION COMPARISON
+# -----------------------------------------------------------------------------
+
+cat("\n========== REGIONALIZATION COMPARISON ==========\n\n")
+
+cat("Comparing all regionalization methods (8 regions each)...\n\n")
+
+methods <- list(
+  skater = function() skater(nc, c("SID74", "SID79"), n_regions = 8, seed = 42),
+  ward = function() ward_spatial(nc, c("SID74", "SID79"), n_regions = 8),
+  azp_basic = function() azp(nc, c("SID74", "SID79"), n_regions = 8, method = "basic", seed = 42),
+  azp_tabu = function() azp(nc, c("SID74", "SID79"), n_regions = 8, method = "tabu", seed = 42),
+  azp_sa = function() azp(nc, c("SID74", "SID79"), n_regions = 8, method = "sa", seed = 42),
+  spenc = function() spenc(nc, c("SID74", "SID79"), n_regions = 8, seed = 42)
+)
+
+for (name in names(methods)) {
+  start <- Sys.time()
+  result <- methods[[name]]()
+  elapsed <- as.numeric(Sys.time() - start, units = "secs")
+  meta <- attr(result, "spopt")
+  cat(sprintf("   %-12s: objective=%8.2f, time=%.4fs\n",
+      name, meta$objective, elapsed))
 }
 
 # -----------------------------------------------------------------------------
@@ -208,7 +285,7 @@ if (requireNamespace("tidycensus", quietly = TRUE)) {
     start <- Sys.time()
     result_tx <- max_p_regions(
       tx,
-      attrs = ~ estimate_income,
+      attrs = "estimate_income",
       threshold_var = "estimate_pop",
       threshold = thresh,
       n_iterations = 100,
@@ -274,48 +351,49 @@ if (requireNamespace("ggplot2", quietly = TRUE)) {
   print(p2)
   cat("   Max-P plot displayed\n\n")
 
+  cat("Plotting AZP results...\n")
+  p3 <- ggplot(result_azp) +
+    geom_sf(aes(fill = factor(.region)), color = "white", linewidth = 0.2) +
+    scale_fill_viridis_d(name = "Region") +
+    labs(title = "AZP Regionalization of NC Counties",
+         subtitle = "8 regions using tabu search") +
+    theme_minimal()
+  print(p3)
+  cat("   AZP plot displayed\n\n")
+
 } else {
   cat("Plotting with base R (install ggplot2 for better plots)...\n")
-  par(mfrow = c(1, 2))
-  plot(result_skater[".region"], main = "SKATER Regionalization")
-  plot(result_maxp[".region"], main = "Max-P Regionalization")
+  par(mfrow = c(2, 2))
+  plot(result_skater[".region"], main = "SKATER")
+  plot(result_ward[".region"], main = "Ward Spatial")
+  plot(result_maxp[".region"], main = "Max-P")
+  plot(result_azp[".region"], main = "AZP")
   par(mfrow = c(1, 1))
   cat("   Plots displayed\n\n")
 }
 
 # -----------------------------------------------------------------------------
-# WHAT'S STILL TODO / NOT YET IMPLEMENTED
+# SUMMARY
 # -----------------------------------------------------------------------------
 
-cat("========== TODO / NOT IMPLEMENTED ==========\n\n")
-
-cat("1. azp() - Automatic Zoning Procedure\n")
-cat("   Status: Rust stub exists, returns empty. R wrapper not created.\n")
-cat("   What's needed: Implement local search with tabu/SA variants in Rust\n\n")
-
-cat("2. spenc() - Spectral clustering with spatial constraints\n")
-cat("   Status: Not started\n")
-cat("   What's needed: Eigendecomposition + k-means in Rust\n\n")
-
-cat("3. frlm() - Flow Refueling Location Model\n")
-cat("   Status: Not started\n")
-cat("   What's needed: Network flow optimization, most complex algorithm\n\n")
-
-cat("4. ward_spatial() spatial constraint\n")
-cat("   Status: Works but does NOT enforce spatial contiguity\n")
-cat("   What's needed: Implement constrained agglomerative clustering\n\n")
-
 cat("========== SUMMARY ==========\n\n")
-cat("WORKING (10 functions):\n")
-cat("  - sp_weights(), distance_matrix()\n")
-cat("  - skater(), ward_spatial(), max_p_regions()\n")
-cat("  - lscp(), mclp(), p_median(), p_center(), p_dispersion()\n\n")
+cat("WORKING (14 functions):\n")
+cat("  Utilities:\n")
+cat("    - sp_weights(), distance_matrix()\n")
+cat("  Regionalization:\n")
+cat("    - skater(), ward_spatial(), max_p_regions()\n")
+cat("    - azp() [basic, tabu, sa], spenc()\n")
+cat("  Facility Location:\n")
+cat("    - lscp(), mclp(), p_median(), p_center(), p_dispersion()\n")
+cat("    - frlm()\n\n")
 
-cat("TODO (4 functions):\n")
-cat("  - azp(), spenc()\n")
-cat("  - frlm()\n")
-cat("  - ward_spatial() spatial constraint enforcement\n\n")
+cat("All regionalization algorithms:\n")
+cat("  - Enforce spatial contiguity\n")
+cat("  - Use parallel Rust implementations\n")
+cat("  - Return sf objects with .region column\n\n")
 
-cat("All facility location algorithms use HiGHS MIP solver via Rust.\n")
-cat("All regionalization algorithms use parallel Rust implementations.\n")
-cat("All working functions return sf objects as first-class citizens.\n")
+cat("All facility location algorithms:\n")
+cat("  - Use HiGHS MIP solver (or greedy heuristic for FRLM)\n")
+cat("  - Return sf objects with .selected column\n\n")
+
+cat("All functions return first-class sf objects with spopt metadata.\n")
