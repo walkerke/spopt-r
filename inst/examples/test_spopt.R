@@ -191,6 +191,47 @@ cat("   Facilities selected:", meta_frlm$n_facilities, "\n")
 cat("   Coverage:", round(meta_frlm$coverage_pct, 1), "%\n")
 cat("   SUCCESS\n\n")
 
+cat("14. Testing huff() - Huff Model market share analysis...\n")
+# Create stores with attractiveness variables
+stores <- st_as_sf(data.frame(
+  id = c("Store_A", "Store_B", "Store_C"),
+  sqft = c(50000, 25000, 75000),
+  parking = c(200, 100, 300),
+  x = c(0.2, 0.8, 0.5),
+  y = c(0.2, 0.8, 0.5)
+), coords = c("x", "y"))
+
+result_huff <- huff(
+  demand, stores,
+  attractiveness_col = c("sqft", "parking"),
+  attractiveness_exponent = c(1.0, 0.5),
+  distance_exponent = -2,
+  sales_potential_col = "population"
+)
+cat("   Stores:", nrow(result_huff$stores), "\n")
+cat("   Market shares:", paste(round(result_huff$stores$.market_share, 3), collapse = ", "), "\n")
+cat("   Total expected sales:", round(sum(result_huff$stores$.expected_sales), 0), "\n")
+cat("   SUCCESS\n\n")
+
+cat("15. Testing cflp() - Capacitated Facility Location...\n")
+# Add capacity and cost to facilities
+facilities_cflp <- facilities
+facilities_cflp$capacity <- rep(6000, nrow(facilities_cflp))
+facilities_cflp$facility_cost <- runif(nrow(facilities_cflp), 100, 500)
+
+result_cflp <- cflp(
+  demand, facilities_cflp,
+  n_facilities = 4,
+  weight_col = "population",
+  capacity_col = "capacity",
+  facility_cost_col = "facility_cost"
+)
+meta_cflp <- attr(result_cflp, "spopt")
+cat("   Facilities opened:", sum(result_cflp$facilities$.selected), "\n")
+cat("   Total cost:", round(meta_cflp$objective, 2), "\n")
+cat("   Mean distance:", round(meta_cflp$mean_distance, 4), "\n")
+cat("   SUCCESS\n\n")
+
 # -----------------------------------------------------------------------------
 # MAX-P REGIONS BENCHMARK
 # -----------------------------------------------------------------------------
@@ -377,7 +418,7 @@ if (requireNamespace("ggplot2", quietly = TRUE)) {
 # -----------------------------------------------------------------------------
 
 cat("========== SUMMARY ==========\n\n")
-cat("WORKING (14 functions):\n")
+cat("WORKING (16 functions):\n")
 cat("  Utilities:\n")
 cat("    - sp_weights(), distance_matrix()\n")
 cat("  Regionalization:\n")
@@ -385,7 +426,9 @@ cat("    - skater(), ward_spatial(), max_p_regions()\n")
 cat("    - azp() [basic, tabu, sa], spenc()\n")
 cat("  Facility Location:\n")
 cat("    - lscp(), mclp(), p_median(), p_center(), p_dispersion()\n")
-cat("    - frlm()\n\n")
+cat("    - cflp(), frlm()\n")
+cat("  Market Analysis:\n")
+cat("    - huff()\n\n")
 
 cat("All regionalization algorithms:\n")
 cat("  - Enforce spatial contiguity\n")
