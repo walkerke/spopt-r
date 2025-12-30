@@ -4,8 +4,16 @@
 //! This model optimizes facility placement to maximize coverage of flows
 //! (origin-destination paths) subject to vehicle range constraints.
 //!
-//! Based on: Kuby & Lim (2005), "The flow-refueling location problem for
-//! alternative-fuel vehicles"
+//! The FRLM models round-trip refueling with these key assumptions:
+//! - Vehicles start at origin with HALF a tank (can travel R/2)
+//! - At each open station, vehicles refuel to full (can travel R)
+//! - A flow is "covered" if the round trip can be completed
+//!
+//! Based on:
+//! - Kuby, M., & Lim, S. (2005). The flow-refueling location problem for
+//!   alternative-fuel vehicles. Socio-Economic Planning Sciences, 39(2), 125-145.
+//! - Capar, I., & Kuby, M. (2012). An efficient formulation of the flow refueling
+//!   location model for alternative-fuel stations. IIE Transactions, 44(8), 622-636.
 
 use extendr_api::prelude::*;
 use std::collections::HashSet;
@@ -25,43 +33,70 @@ struct Flow {
 
 impl Flow {
     /// Check if a set of facilities can cover this flow given vehicle range
+    ///
+    /// Based on the Flow Refueling Location Model (FRLM) from:
+    /// - Kuby & Lim (2005): Original FRLM formulation
+    /// - Capar & Kuby (2012): Efficient FRLM formulation
+    ///
+    /// Key assumptions:
+    /// 1. Vehicles start at origin with HALF a tank (can travel R/2)
+    /// 2. At each open station, vehicles refuel to full (can travel R)
+    /// 3. Flow is covered if the ROUND TRIP can be completed
+    ///
+    /// Coverage requirements:
+    /// - First open station must be within R/2 from origin (half-tank start)
+    /// - Each subsequent open station must be within R from previous
+    /// - Last open station must be within R/2 of destination (round-trip back)
     fn is_covered_by(&self, facilities: &HashSet<usize>, vehicle_range: f64) -> bool {
         if self.candidates.is_empty() || self.distances.is_empty() {
             return false;
         }
 
-        // Check forward path: can we reach the destination with refueling?
-        // Starting with full tank at origin
-        let max_range = vehicle_range;
-        let mut remaining_range = max_range;
-        let mut last_position = 0.0;
+        let half_range = vehicle_range / 2.0;
 
-        for (idx, (&candidate, &distance)) in self.candidates.iter().zip(self.distances.iter()).enumerate() {
-            let segment_distance = distance - last_position;
+        // Path length is the distance from origin to destination
+        // (destination should be the last candidate in the sorted list)
+        let path_length = *self.distances.last().unwrap();
 
-            if segment_distance > remaining_range {
-                // Can't reach this candidate
+        // Special case: if round trip distance <= range, any single station can refuel
+        // Start with half tank, refuel once, complete trip and return with fuel to spare
+        if 2.0 * path_length <= vehicle_range {
+            return self.candidates.iter().any(|c| facilities.contains(c));
+        }
+
+        // Collect distances to open stations on this path
+        // (candidates are already sorted by distance from origin)
+        let open_station_distances: Vec<f64> = self
+            .candidates
+            .iter()
+            .zip(self.distances.iter())
+            .filter(|(&c, _)| facilities.contains(&c))
+            .map(|(_, &d)| d)
+            .collect();
+
+        if open_station_distances.is_empty() {
+            return false;
+        }
+
+        // Check 1: First open station must be within R/2 from origin
+        // (driver starts with half a tank per Kuby & Lim 2005)
+        if open_station_distances[0] > half_range {
+            return false;
+        }
+
+        // Check 2: Each subsequent open station must be within R of previous
+        for i in 1..open_station_distances.len() {
+            if open_station_distances[i] - open_station_distances[i - 1] > vehicle_range {
                 return false;
             }
+        }
 
-            if facilities.contains(&candidate) {
-                // Refuel at this facility
-                remaining_range = max_range;
-            } else {
-                remaining_range -= segment_distance;
-            }
-
-            last_position = distance;
-
-            // Check if we can reach the destination from the last visited point
-            if idx == self.candidates.len() - 1 {
-                // This is the last candidate, check if we can complete the trip
-                let total_path_length = *self.distances.last().unwrap_or(&0.0);
-                let distance_to_end = total_path_length - distance;
-                if distance_to_end > remaining_range {
-                    return false;
-                }
-            }
+        // Check 3: Last open station must be within R/2 of destination
+        // This ensures the round trip can be completed:
+        // last_station -> destination -> last_station requires 2 * (path_length - last_station_dist) <= R
+        let last_station_dist = *open_station_distances.last().unwrap();
+        if path_length - last_station_dist > half_range {
+            return false;
         }
 
         true

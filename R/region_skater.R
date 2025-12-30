@@ -9,8 +9,18 @@
 #' @param attrs Character vector of column names to use for clustering
 #'   (e.g., `c("var1", "var2")`). If NULL, uses all numeric columns.
 #' @param n_regions Integer. Number of regions (clusters) to create.
-#' @param weights Spatial weights specification. One of "queen" (default),
-#'   "rook", or an nb object from spdep.
+#' @param weights Spatial weights specification. Can be:
+#'   \itemize{
+#'     \item `"queen"` (default): Polygons sharing any boundary point are neighbors
+#'     \item `"rook"`: Polygons sharing an edge are neighbors
+#'     \item An `nb` object from spdep or created with [sp_weights()]
+#'     \item A list for other weight types: `list(type = "knn", k = 6)` for
+#'       k-nearest neighbors, or `list(type = "distance", d = 5000)` for
+#'       distance-based weights
+#'   }
+#' @param bridge_islands Logical. If TRUE, automatically connect disconnected
+#'   components (e.g., islands) using nearest-neighbor edges. If FALSE (default),
+#'   the function will error when the spatial weights graph is disconnected.
 #' @param floor Optional. Column name specifying a floor constraint variable.
 #' @param floor_value Numeric. Minimum sum of floor variable required per region.
 #'   Only used if `floor` is specified.
@@ -48,6 +58,7 @@ skater <- function(data,
                    attrs = NULL,
                    n_regions,
                    weights = "queen",
+                   bridge_islands = FALSE,
                    floor = NULL,
                    floor_value = 0,
                    scale = TRUE,
@@ -85,7 +96,7 @@ skater <- function(data,
   }
 
   # Prepare spatial weights
-  nb <- prepare_weights(data, weights)
+  nb <- prepare_weights(data, weights, bridge_islands = bridge_islands, call_name = "skater")
 
   # Convert nb to sparse matrix indices
   adj <- nb_to_adj_indices(nb)
@@ -121,10 +132,20 @@ end_time <- Sys.time()
   # Compute objective (total within-cluster SSD)
   objective <- compute_ssd(attr_matrix, labels)
 
+  # Check if we achieved the requested number of regions
+  actual_n_regions <- length(unique(labels))
+  if (actual_n_regions < n_regions) {
+    warning(
+      "Could only create ", actual_n_regions, " regions (requested ", n_regions, "). ",
+      if (!is.null(floor)) "Floor constraint may be too restrictive." else "Graph may be disconnected.",
+      call. = FALSE
+    )
+  }
+
   # Attach metadata
   metadata <- list(
     algorithm = "skater",
-    n_regions = length(unique(labels)),
+    n_regions = actual_n_regions,
     objective = objective,
     floor = floor,
     floor_value = floor_value,

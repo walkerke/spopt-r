@@ -2,6 +2,7 @@
 #'
 #' Solves the P-Median problem: minimize total weighted distance from demand
 #' points to their assigned facilities by locating exactly p facilities.
+#' This is an efficiency-focused objective that minimizes overall travel burden.
 #'
 #' @param demand An sf object representing demand points.
 #' @param facilities An sf object representing candidate facility locations.
@@ -12,11 +13,45 @@
 #' @param verbose Logical. Print solver progress.
 #'
 #' @return A list with two sf objects:
+#'
 #'   \itemize{
 #'     \item `$demand`: Original demand sf with `.facility` column (assigned facility)
 #'     \item `$facilities`: Original facilities sf with `.selected` and `.n_assigned` columns
 #'   }
 #'   Metadata is stored in the "spopt" attribute.
+#'
+#' @details
+#' The p-median problem minimizes the total weighted distance (or travel cost)
+#' between demand points and their nearest assigned facility. It is the most
+#' widely used location model for efficiency-oriented facility siting.
+#'
+#' The integer programming formulation is:
+#' \deqn{\min \sum_i \sum_j w_i d_{ij} x_{ij}}
+#' Subject to:
+#' \deqn{\sum_j y_j = p}
+#' \deqn{\sum_j x_{ij} = 1 \quad \forall i}
+#' \deqn{x_{ij} \leq y_j \quad \forall i,j}
+#' \deqn{x_{ij}, y_j \in \{0,1\}}
+#'
+#' Where \eqn{w_i} is the demand weight at location i, \eqn{d_{ij}} is the
+#' distance from demand i to facility j, \eqn{x_{ij} = 1} if demand i is
+#' assigned to facility j, and \eqn{y_j = 1} if facility j is selected.
+#'
+#' @section Use Cases:
+#' P-median is appropriate when minimizing total travel cost or distance:
+#' \itemize{
+#'   \item **Public facilities**: Schools, libraries, or community centers where
+#'     the goal is to minimize total student/patron travel
+#'   \item **Warehouses and distribution**: Locating distribution centers to
+#'     minimize total shipping costs to customers
+#'   \item **Healthcare**: Positioning clinics to minimize aggregate patient
+#'     travel time across a population
+#'   \item **Service depots**: Locating maintenance facilities to minimize
+#'     total technician travel to service calls
+#' }
+#'
+#' For equity-focused objectives where no demand point should be too far,
+#' consider [p_center()] instead.
 #'
 #' @examples
 #' \dontrun{
@@ -33,6 +68,13 @@
 #' # Mean distance to assigned facility
 #' attr(result, "spopt")$mean_distance
 #' }
+#'
+#' @references
+#' Hakimi, S. L. (1964). Optimum Locations of Switching Centers and the
+#' Absolute Centers and Medians of a Graph. Operations Research, 12(3), 450-459.
+#' \doi{10.1287/opre.12.3.450}
+#'
+#' @seealso [p_center()] for minimizing maximum distance (equity objective)
 #'
 #' @export
 p_median <- function(demand,

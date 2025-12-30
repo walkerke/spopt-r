@@ -83,9 +83,13 @@
 #' }
 #'
 #' @references
-#' Cornuejols, G., Fisher, M. L., & Nemhauser, G. L. (1977). Location of bank
-#' accounts to optimize float: An analytic study of exact and approximate
-#' algorithms. Management Science, 23(8), 789-810.
+#' Daskin, M. S. (2013). Network and discrete location: Models, algorithms,
+#' and applications (2nd ed.). John Wiley & Sons.
+#' \doi{10.1002/9781118537015}
+#'
+#' Sridharan, R. (1995). The capacitated plant location problem.
+#' European Journal of Operational Research, 87(2), 203-213.
+#' \doi{10.1016/0377-2217(95)00042-O}
 #'
 #' @export
 cflp <- function(demand,

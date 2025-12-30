@@ -11,12 +11,10 @@
 #'     \item \code{volume}: Flow volume (e.g., number of trips)
 #'   }
 #' @param candidates An sf object with candidate facility locations (points).
-#' @param network A network representation. Can be:
-#'   \itemize{
-#'     \item An sfnetwork object
-#'     \item An igraph object with edge weights
-#'     \item A distance matrix between candidates
-#'   }
+#' @param network Optional. A distance matrix between candidates. If NULL
+#'   (default), Euclidean distances are computed from candidate geometries.
+#'   For network distances, compute externally using packages like r5r or
+#'   dodgr and pass the resulting matrix here.
 #' @param vehicle_range Numeric. Maximum vehicle range (same units as network distances).
 #' @param n_facilities Integer. Number of facilities to place.
 #' @param method Character. Optimization method: "greedy" (default and currently only option).
@@ -36,8 +34,20 @@
 #' vehicles, hydrogen fuel cell vehicles) along travel paths.
 #'
 #' A flow (origin-destination path) is "covered" if a vehicle can complete
-#' the trip with refueling stops at the selected facilities, never exceeding
-#' its maximum range between stops.
+#' the **round trip** with refueling stops at the selected facilities. The model
+#' assumes:
+#' \itemize{
+#'   \item Vehicles start at the origin with **half a tank** (can travel R/2)
+#'   \item At each open station, vehicles refuel to full (can travel R)
+#'   \item The round trip must be completable without running out of fuel
+#' }
+#'
+#' For a flow to be covered, three conditions must be met:
+#' \enumerate{
+#'   \item First open station must be within R/2 from origin (half-tank start)
+#'   \item Each subsequent open station must be within R of the previous
+#'   \item Last open station must be within R/2 of destination (to allow return)
+#' }
 #'
 #' This implementation uses a greedy heuristic that iteratively selects the
 #' facility providing the greatest marginal increase in covered flow volume.
@@ -47,7 +57,7 @@
 #' \itemize{
 #'   \item \code{flows}: Data frame with origin, destination, volume
 #'   \item \code{candidates}: sf points for potential facility locations
-#'   \item \code{network}: Distance matrix or network object
+#'   \item \code{network}: Pre-computed distance matrix (optional)
 #' }
 #'
 #' @examples
@@ -79,6 +89,11 @@
 #' @references
 #' Kuby, M., & Lim, S. (2005). The flow-refueling location problem for
 #' alternative-fuel vehicles. Socio-Economic Planning Sciences, 39(2), 125-145.
+#' \doi{10.1016/j.seps.2004.03.001}
+#'
+#' Capar, I., & Kuby, M. (2012). An efficient formulation of the flow refueling
+#' location model for alternative-fuel stations. IIE Transactions, 44(8), 622-636.
+#' \doi{10.1080/0740817X.2011.635175}
 #'
 #' @export
 frlm <- function(flows,

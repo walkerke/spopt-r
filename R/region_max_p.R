@@ -13,8 +13,23 @@
 #'   variable (e.g., population, income). Each region must have a sum of this
 #'   variable >= `threshold`.
 #' @param threshold Numeric. Minimum sum of `threshold_var` required per region.
-#' @param weights Spatial weights specification. One of "queen" (default),
-#'   "rook", or an nb object from spdep.
+#' @param weights Spatial weights specification. Can be:
+#'   \itemize{
+#'     \item `"queen"` (default): Polygons sharing any boundary point are neighbors
+#'     \item `"rook"`: Polygons sharing an edge are neighbors
+#'     \item An `nb` object from spdep or created with [sp_weights()]
+#'     \item A list for other weight types: `list(type = "knn", k = 6)` for
+#'       k-nearest neighbors, or `list(type = "distance", d = 5000)` for
+#'       distance-based weights
+#'   }
+#'   KNN weights guarantee connectivity (no islands), which can be useful
+#'   for datasets with disconnected polygons.
+#' @param bridge_islands Logical. If TRUE, automatically connect disconnected
+#'   components (e.g., islands) using nearest-neighbor edges. If FALSE (default),
+#'   the function will error when the spatial weights graph is disconnected.
+#'   This is useful for datasets like LA County with Catalina Islands, or
+#'   archipelago data where physical adjacency doesn't exist but regionalization
+#'   is still desired.
 #' @param compact Logical. If TRUE, optimize for region compactness in addition
 #'   to attribute homogeneity. Compact regions have more regular shapes, which
 #'   is useful for sales territories, patrol areas, and electoral districts.
@@ -48,7 +63,7 @@
 #'   }
 #'
 #' @details
-#' The Max-P algorithm (Duque, Anselin & Rey, 2012; Wei, Rey & Knaap, 2020)
+#' The Max-P algorithm (Duque, Anselin & Rey, 2012; Wei, Rey & Knaap, 2021)
 #' solves the problem of aggregating n geographic areas into the maximum number
 #' of homogeneous regions while ensuring:
 #'
@@ -71,6 +86,25 @@
 #'   \item Reduce gerrymandering potential (electoral districts)
 #'   \item Often result in finding MORE regions due to efficient space usage
 #' }
+#'
+#' \strong{Compactness metric}: This implementation uses a centroid dispersion
+#' measure during optimization, rather than the Normalized Moment of Inertia (NMI)
+#' described in Feng et al. (2022). This design choice provides two advantages:
+#' \enumerate{
+#'   \item \strong{Point-based regionalization}: The algorithm works with both
+#'     polygon and point geometries. For point data, use KNN or distance-based
+#'     weights (e.g., `weights = list(type = "knn", k = 6)`).
+#'   \item \strong{Computational efficiency}: Centroid dispersion is O(n) per
+#'     region versus O(v) for NMI where v = total polygon vertices.
+#' }
+#' For polygon data, centroids are computed via [sf::st_centroid()]. Users should
+#' be aware that centroid-based compactness may be less accurate for highly
+#' irregular shapes or large, sparsely-populated areas where the centroid poorly
+#' represents the polygon's spatial extent.
+#'
+#' The reported `mean_compactness` and `region_compactness` in results use
+#' Polsby-Popper (4*pi*A/P^2), a standard geometric compactness measure for
+#' polygons. For point data, these metrics are not computed.
 #'
 #' This implementation is optimized for speed using:
 #' \itemize{
@@ -110,6 +144,23 @@
 #'
 #' # Plot results
 #' plot(result[".region"])
+#'
+#' # Point-based regionalization (e.g., store locations, sensor networks)
+#' # Use KNN weights since points don't have polygon contiguity
+#' points <- st_as_sf(data.frame(
+#'   x = runif(200), y = runif(200),
+#'   customers = rpois(200, 100),
+#'   avg_income = rnorm(200, 50000, 15000)
+#' ), coords = c("x", "y"))
+#'
+#' result_points <- max_p_regions(
+#'   points,
+#'   attrs = "avg_income",
+#'   threshold_var = "customers",
+#'   threshold = 500,
+#'   weights = list(type = "knn", k = 6),
+#'   compact = TRUE
+#' )
 #' }
 #'
 #' @references
@@ -129,6 +180,7 @@ max_p_regions <- function(data,
                           threshold_var,
                           threshold,
                           weights = "queen",
+                          bridge_islands = FALSE,
                           compact = FALSE,
                           compact_weight = 0.5,
                           n_iterations = 100L,
@@ -200,6 +252,9 @@ max_p_regions <- function(data,
   if (!is.numeric(compact_weight) || compact_weight < 0 || compact_weight > 1) {
     stop("`compact_weight` must be between 0 and 1", call. = FALSE)
   }
+  if (!is.logical(bridge_islands) || length(bridge_islands) != 1) {
+    stop("`bridge_islands` must be TRUE or FALSE", call. = FALSE)
+  }
 
   # Extract centroids if compactness is enabled
   centroids_x <- NULL
@@ -220,7 +275,7 @@ max_p_regions <- function(data,
   }
 
   # Prepare spatial weights
-  nb <- prepare_weights(data, weights)
+  nb <- prepare_weights(data, weights, bridge_islands = bridge_islands, call_name = "max_p_regions")
 
   # Convert nb to sparse matrix indices
   adj <- nb_to_adj_indices(nb)
@@ -324,7 +379,15 @@ compute_region_stats <- function(result, threshold_var, threshold) {
 
 # Compute Polsby-Popper compactness for regions (internal)
 # Polsby-Popper = 4 * pi * Area / Perimeter^2 (0-1, 1 = circle)
+# Returns NULL for point geometries (compactness not meaningful)
 compute_polsby_popper <- function(result) {
+  # Check geometry type - Polsby-Popper only makes sense for polygons
+
+  geom_type <- sf::st_geometry_type(result, by_geometry = FALSE)
+  if (geom_type %in% c("POINT", "MULTIPOINT")) {
+    return(NULL)
+  }
+
   regions <- sort(unique(result$.region))
   by_region <- numeric(length(regions))
 

@@ -18,6 +18,36 @@
 #'   }
 #'   Metadata is stored in the "spopt" attribute.
 #'
+#' @details
+#' The LSCP minimizes the number of facilities required to ensure that every
+#' demand point is within the service radius of at least one facility. This is
+#' a mandatory coverage model where full coverage is required.
+#'
+#' The integer programming formulation is:
+#' \deqn{\min \sum_j y_j}
+#' Subject to:
+#' \deqn{\sum_j a_{ij} y_j \geq 1 \quad \forall i}
+#' \deqn{y_j \in \{0,1\}}
+#'
+#' Where \eqn{y_j = 1} if facility j is selected, and \eqn{a_{ij} = 1} if
+#' facility j can cover demand point i (distance \eqn{\leq} service radius).
+#'
+#' @section Use Cases:
+#' LSCP is appropriate when complete coverage is mandatory:
+#' \itemize{
+#'   \item **Emergency services**: Fire stations, ambulance depots, or hospitals
+#'     where every resident must be reachable within a response time standard
+#'   \item **Public services**: Schools, polling places, or post offices where
+#'     universal access is required by law or policy
+#'   \item **Infrastructure**: Cell towers or utility substations where gaps
+#'     in coverage are unacceptable
+#'   \item **Retail/logistics**: Warehouse locations to ensure all customers
+#'     can receive same-day or next-day delivery
+#' }
+#'
+#' For situations where complete coverage is not required or not feasible
+#' within budget constraints, consider [mclp()] instead.
+#'
 #' @examples
 #' \dontrun{
 #' library(sf)
@@ -32,6 +62,13 @@
 #' # View selected facilities
 #' result$facilities[result$facilities$.selected, ]
 #' }
+#'
+#' @references
+#' Toregas, C., Swain, R., ReVelle, C., & Bergman, L. (1971). The Location of
+#' Emergency Service Facilities. Operations Research, 19(6), 1363-1373.
+#' \doi{10.1287/opre.19.6.1363}
+#'
+#' @seealso [mclp()] for maximizing coverage with a fixed number of facilities
 #'
 #' @export
 lscp <- function(demand,

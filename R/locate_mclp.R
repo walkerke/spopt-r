@@ -19,6 +19,41 @@
 #'   }
 #'   Metadata is stored in the "spopt" attribute.
 #'
+#' @details
+#' The MCLP maximizes the total weighted demand covered by locating exactly p
+#' facilities. Unlike [lscp()], which requires full coverage, MCLP accepts
+#' partial coverage and optimizes for the best possible outcome given a fixed
+#' budget (number of facilities).
+#'
+#' The integer programming formulation is:
+#' \deqn{\max \sum_i w_i z_i}
+#' Subject to:
+#' \deqn{\sum_j y_j = p}
+#' \deqn{z_i \leq \sum_j a_{ij} y_j \quad \forall i}
+#' \deqn{y_j, z_i \in \{0,1\}}
+#'
+#' Where \eqn{w_i} is the weight (demand) at location i, \eqn{y_j = 1} if
+#' facility j is selected, \eqn{z_i = 1} if demand i is covered, and
+#' \eqn{a_{ij} = 1} if facility j can cover demand i.
+#'
+#' @section Use Cases:
+#' MCLP is appropriate when you have a fixed budget or capacity constraint:
+#' \itemize{
+#'   \item **Healthcare access**: Locating p clinics to maximize the population
+#'     within a 30-minute drive, given limited funding
+#'   \item **Retail site selection**: Choosing p store locations to maximize
+#'     the number of potential customers within a trade area
+#'   \item **Emergency services**: Placing p ambulance stations to maximize
+#'     the population reachable within an 8-minute response time
+#'   \item **Conservation**: Selecting p reserve sites to maximize the number
+#'     of species or habitat area protected
+#'   \item **Telecommunications**: Locating p cell towers to maximize population
+#'     coverage when full coverage is not economically feasible
+#' }
+#'
+#' For situations where complete coverage is required, use [lscp()] to find
+#' the minimum number of facilities needed.
+#'
 #' @examples
 #' \dontrun{
 #' library(sf)
@@ -35,6 +70,12 @@
 #'
 #' attr(result, "spopt")$coverage_pct
 #' }
+#'
+#' @references
+#' Church, R., & ReVelle, C. (1974). The Maximal Covering Location Problem.
+#' Papers in Regional Science, 32(1), 101-118. \doi{10.1007/BF01942293}
+#'
+#' @seealso [lscp()] for finding the minimum facilities needed for complete coverage
 #'
 #' @export
 mclp <- function(demand,

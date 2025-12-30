@@ -6,7 +6,7 @@
 #'
 #' @param x An sf object (demand points for facility location, or areas for regionalization).
 #' @param y An sf object (facility locations). If NULL, computes distances within x.
-#' @param type Distance type: "euclidean" (default), "manhattan", or "network".
+#' @param type Distance type: "euclidean" (default) or "manhattan".
 #' @param use_centroids Logical. If TRUE (default for polygons), use polygon centroids.
 #'
 #' @return A numeric matrix of distances. Rows correspond to x, columns to y.

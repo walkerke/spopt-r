@@ -2,8 +2,8 @@
 #'
 #' Solves the P-Center problem: minimize the maximum distance from any demand
 #' point to its nearest facility by locating exactly p facilities.
-#' This is an equity-focused objective that ensures no demand point is too
-#' far from service.
+#' This is an equity-focused (minimax) objective that ensures no demand point
+#' is too far from service.
 #'
 #' @param demand An sf object representing demand points.
 #' @param facilities An sf object representing candidate facility locations.
@@ -19,6 +19,40 @@
 #'   }
 #'   Metadata includes `max_distance` (the objective value).
 #'
+#' @details
+#' The p-center problem minimizes the maximum distance between any demand point
+#' and its assigned facility. This "minimax" objective ensures equitable access
+#' by focusing on the worst-served location rather than average performance.
+#'
+#' The integer programming formulation is:
+#' \deqn{\min W}
+#' Subject to:
+#' \deqn{\sum_j y_j = p}
+#' \deqn{\sum_j x_{ij} = 1 \quad \forall i}
+#' \deqn{x_{ij} \leq y_j \quad \forall i,j}
+#' \deqn{\sum_j d_{ij} x_{ij} \leq W \quad \forall i}
+#' \deqn{x_{ij}, y_j \in \{0,1\}}
+#'
+#' Where W is the maximum distance to minimize, \eqn{d_{ij}} is the distance
+#' from demand i to facility j, \eqn{x_{ij} = 1} if demand i is assigned to
+#' facility j, and \eqn{y_j = 1} if facility j is selected.
+#'
+#' @section Use Cases:
+#' P-center is appropriate when equity and worst-case performance matter:
+#' \itemize{
+#'   \item **Emergency services**: Fire stations or ambulance depots where
+#'     response time standards must be met for all residents
+#'   \item **Equity-focused planning**: Ensuring no community is underserved,
+#'     even if it increases average travel distance
+#'   \item **Critical infrastructure**: Backup facilities or emergency shelters
+#'     where everyone must be within reach
+#'   \item **Service level guarantees**: When contracts or regulations specify
+#'     maximum acceptable distance or response time
+#' }
+#'
+#' For efficiency-focused objectives that minimize total travel, consider
+#' [p_median()] instead.
+#'
 #' @examples
 #' \dontrun{
 #' library(sf)
@@ -32,6 +66,13 @@
 #' # Maximum distance any demand point must travel
 #' attr(result, "spopt")$max_distance
 #' }
+#'
+#' @references
+#' Hakimi, S. L. (1965). Optimum Distribution of Switching Centers in a
+#' Communication Network and Some Related Graph Theoretic Problems.
+#' Operations Research, 13(3), 462-475. \doi{10.1287/opre.13.3.462}
+#'
+#' @seealso [p_median()] for minimizing total weighted distance (efficiency objective)
 #'
 #' @export
 p_center <- function(demand,

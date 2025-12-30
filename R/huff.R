@@ -8,11 +8,14 @@
 #' @param demand An sf object representing demand points or areas. Can be
 #'   customer locations, census block groups, grid cells, etc.
 #' @param stores An sf object representing store/facility locations.
-#' @param attractiveness_col Character. Column name in `stores` containing
-#'   the attractiveness value (e.g., square footage, number of products).
-#' @param attractiveness_exponent Numeric. Exponent for attractiveness
-#'   (default 1). Higher values increase the importance of attractiveness.
+#' @param attractiveness_col Character vector. Column name(s) in `stores`
+#'   containing attractiveness values (e.g., square footage, parking spaces).
+#'   Multiple columns can be specified for composite attractiveness.
+#' @param attractiveness_exponent Numeric vector. Exponent(s) for attractiveness
+#'   (default 1). Must be same length as `attractiveness_col` or length 1
+#'   (recycled). Higher values increase the importance of that variable.
 #' @param distance_exponent Numeric. Distance decay exponent (default -1.5).
+#'
 #'   Should be negative; more negative = faster decay with distance.
 #' @param sales_potential_col Optional character. Column name in `demand`
 #'   containing sales potential values (e.g., disposable income, population).
@@ -43,15 +46,22 @@
 #' The Huff model calculates the probability that a consumer at location i
 #' will choose store j using:
 #'
-#' \deqn{P_{ij} = \frac{A_j^\alpha \times D_{ij}^\beta}{\sum_k A_k^\alpha \times D_{ik}^\beta}}
+#' \deqn{P_{ij} = \frac{A_j \times D_{ij}^\beta}{\sum_k A_k \times D_{ik}^\beta}}
 #'
 #' Where:
 #' \itemize{
-#'   \item \eqn{A_j} is the attractiveness of store j
+#'   \item \eqn{A_j} is the composite attractiveness of store j
 #'   \item \eqn{D_{ij}} is the distance from i to j
-#'   \item \eqn{\alpha} is the attractiveness exponent (default 1)
 #'   \item \eqn{\beta} is the distance decay exponent (default -1.5)
 #' }
+#'
+#' When multiple attractiveness variables are specified, the composite
+#' attractiveness is computed as:
+#'
+#' \deqn{A_j = \prod_m V_{jm}^{\alpha_m}}
+#'
+#' Where \eqn{V_{jm}} is the value of attractiveness variable m for store j,
+#' and \eqn{\alpha_m} is the corresponding exponent.
 #'
 #' The distance exponent is typically negative because probability decreases
 #' with distance. Common values range from -1 to -3.
@@ -78,26 +88,36 @@
 #' stores <- st_as_sf(data.frame(
 #'   id = c("Store_A", "Store_B", "Store_C"),
 #'   sqft = c(50000, 25000, 75000),
+#'   parking = c(200, 100, 300),
 #'   x = c(2, 8, 5), y = c(2, 8, 5)
 #' ), coords = c("x", "y"))
 #'
-#' # Compute Huff probabilities
+#' # Single attractiveness variable
 #' result <- huff(demand, stores,
 #'                attractiveness_col = "sqft",
 #'                distance_exponent = -2,
 #'                sales_potential_col = "spending")
 #'
+#' # Multiple attractiveness variables with different exponents
+#' # Composite: A = sqft^1.0 * parking^0.5
+#' result_multi <- huff(demand, stores,
+#'                      attractiveness_col = c("sqft", "parking"),
+#'                      attractiveness_exponent = c(1.0, 0.5),
+#'                      distance_exponent = -2,
+#'                      sales_potential_col = "spending")
+#'
 #' # View market shares
-#' result$stores[, c("id", "sqft", ".market_share", ".expected_sales")]
+#' result_multi$stores[, c("id", "sqft", "parking", ".market_share", ".expected_sales")]
 #'
 #' # Evaluate a new candidate store
 #' candidate <- st_as_sf(data.frame(
-#'   id = "New_Store", sqft = 40000, x = 3, y = 7
+#'   id = "New_Store", sqft = 40000, parking = 250, x = 3, y = 7
 #' ), coords = c("x", "y"))
 #'
 #' all_stores <- rbind(stores, candidate)
 #' result_with_candidate <- huff(demand, all_stores,
-#'                               attractiveness_col = "sqft",
+#'                               attractiveness_col = c("sqft", "parking"),
+#'                               attractiveness_exponent = c(1.0, 0.5),
 #'                               distance_exponent = -2,
 #'                               sales_potential_col = "spending")
 #'
@@ -107,10 +127,10 @@
 #'
 #' @references
 #' Huff, D. L. (1963). A Probabilistic Analysis of Shopping Center Trade Areas.
-#' Land Economics, 39(1), 81-90.
+#' Land Economics, 39(1), 81-90. \doi{10.2307/3144521}
 #'
 #' Huff, D. L. (1964). Defining and Estimating a Trading Area. Journal of
-#' Marketing, 28(3), 34-38.
+#' Marketing, 28(3), 34-38. \doi{10.1177/002224296402800307}
 #'
 #' @export
 huff <- function(demand,
@@ -122,27 +142,43 @@ huff <- function(demand,
                  cost_matrix = NULL,
                  distance_metric = "euclidean") {
   # Input validation
- if (!inherits(demand, "sf")) {
+  if (!inherits(demand, "sf")) {
     stop("`demand` must be an sf object", call. = FALSE)
   }
   if (!inherits(stores, "sf")) {
     stop("`stores` must be an sf object", call. = FALSE)
   }
-  if (!attractiveness_col %in% names(stores)) {
-    stop(paste0("Attractiveness column '", attractiveness_col,
-                "' not found in stores"), call. = FALSE)
+
+  # Validate attractiveness columns
+  attractiveness_col <- as.character(attractiveness_col)
+  missing_cols <- attractiveness_col[!attractiveness_col %in% names(stores)]
+  if (length(missing_cols) > 0) {
+    stop(paste0("Attractiveness column(s) not found in stores: ",
+                paste(missing_cols, collapse = ", ")), call. = FALSE)
   }
 
-  attractiveness <- as.numeric(stores[[attractiveness_col]])
-  if (any(is.na(attractiveness))) {
-    stop("Attractiveness column contains NA values", call. = FALSE)
-  }
-  if (any(attractiveness <= 0)) {
-    stop("All attractiveness values must be positive", call. = FALSE)
+  # Handle exponent recycling
+  if (length(attractiveness_exponent) == 1) {
+    attractiveness_exponent <- rep(attractiveness_exponent, length(attractiveness_col))
+  } else if (length(attractiveness_exponent) != length(attractiveness_col)) {
+    stop(paste0("attractiveness_exponent must be length 1 or same length as ",
+                "attractiveness_col (", length(attractiveness_col), ")"), call. = FALSE)
   }
 
-  # Apply attractiveness exponent
-  attractiveness_adj <- attractiveness^attractiveness_exponent
+  # Compute composite attractiveness: A_j = prod(V_jm ^ alpha_m)
+  attractiveness_adj <- rep(1.0, nrow(stores))
+  for (k in seq_along(attractiveness_col)) {
+    col_vals <- as.numeric(stores[[attractiveness_col[k]]])
+    if (any(is.na(col_vals))) {
+      stop(paste0("Attractiveness column '", attractiveness_col[k],
+                  "' contains NA values"), call. = FALSE)
+    }
+    if (any(col_vals <= 0)) {
+      stop(paste0("All values in '", attractiveness_col[k],
+                  "' must be positive"), call. = FALSE)
+    }
+    attractiveness_adj <- attractiveness_adj * (col_vals ^ attractiveness_exponent[k])
+  }
 
   # Get sales potential if provided
   sales_potential <- NULL
