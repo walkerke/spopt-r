@@ -106,4 +106,23 @@ nc <- st_read(system.file("shape/nc.shp", package = "sf"))
 result <- azp(nc, attrs = c("SID74", "SID79"), n_regions = 8)
 
 # Tabu search (often finds better solutions)
-result <- azp(nc, attrs = c(
+result <- azp(nc, attrs = c("SID74", "SID79"), n_regions = 8,
+              method = "tabu", tabu_length = 15)
+
+# Simulated annealing
+result <- azp(nc, attrs = c("SID74", "SID79"), n_regions = 8,
+              method = "sa", cooling_rate = 0.95)
+
+# View results
+plot(result[".region"])
+}
+
+}
+\references{
+Openshaw, S. (1977). A geographical solution to scale and aggregation
+problems in region-building, partitioning and spatial modelling.
+Transactions of the Institute of British Geographers, 2(4), 459-472.
+
+Openshaw, S., & Rao, L. (1995). Algorithms for reengineering 1991 Census
+geography. Environment and Planning A, 27(3), 425-446.
+}

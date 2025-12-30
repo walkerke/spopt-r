@@ -40,7 +40,11 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 **Windows:**
-Download and run [rustup-init.exe](https://win.rustup.rs/). You may also need [Rtools](https://cran.r-project.org/bin/windows/Rtools/).
+Windows support is experimental. Installation requires:
+1. [Rtools](https://cran.r-project.org/bin/windows/Rtools/)
+2. [Rust](https://win.rustup.rs/) with GNU toolchain: `rustup default stable-x86_64-pc-windows-gnu`
+
+Windows users may find it easier to use [WSL](https://learn.microsoft.com/en-us/windows/wsl/) with the Linux instructions above.
 
 After installation, restart your terminal/R session so `cargo` is on your PATH.
 
