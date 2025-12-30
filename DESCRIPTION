@@ -28,6 +28,6 @@ Suggests:
     r5r
 Config/testthat/edition: 3
 Config/rextendr/version: 0.3.1
-SystemRequirements: Cargo (Rust's package manager), rustc >= 1.70
+SystemRequirements: Cargo (Rust's package manager), rustc >= 1.70, cmake, libclang-dev
 URL: https://github.com/kylewalker/spopt-r
 BugReports: https://github.com/kylewalker/spopt-r/issues
