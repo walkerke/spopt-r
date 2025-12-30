@@ -12,10 +12,6 @@ src/*.dll
 src/rust/target/
 src/.cargo/
 
-# Documentation artifacts
-docs/
-man/*.Rd
-
 # Test artifacts
 tests/testthat/Rplots.pdf
 
