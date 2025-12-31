@@ -35,14 +35,7 @@ Spatial Optimization for R. An R-native implementation of spatial optimization a
 pak::pak("walkerke/spopt-r")
 ```
 
-**Windows:** Uses pre-built binaries - no additional setup required.
-
-**macOS/Linux:** Requires Rust. Install it first, then restart your terminal:
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-The first installation on macOS/Linux compiles the Rust backend, which takes 1-2 minutes.
+Pre-built binaries are available for all platforms - no Rust or compilation required.
 
 ## Usage
 

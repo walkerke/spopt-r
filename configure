@@ -58,13 +58,13 @@ detect_target() {
 }
 
 check_bin_lib() {
-  # If NOT_CRAN=true and no explicit build flag, try pre-built
-  if [ "${NOT_CRAN}" = "true" ] && [ -z "${LIB_BUILD}" ]; then
+  # Always try pre-built first unless explicitly building from source
+  if [ -z "${LIB_BUILD}" ]; then
     LIB_BUILD="false"
   fi
 
-  # On R-universe, try to download pre-built binary
-  if [ -n "${MY_UNIVERSE}" ] && [ -z "${LIB_BUILD}" ]; then
+  # Log if on R-universe
+  if [ -n "${MY_UNIVERSE}" ]; then
     cat <<EOF
 --------------------- [SETTING FOR R-UNIVERSE] ---------------------
 Detected R-universe build <${MY_UNIVERSE}>.
