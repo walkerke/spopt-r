@@ -10,20 +10,24 @@ $(SHLIB): $(STATLIB)
 CARGOTMP = $(CURDIR)/.cargo
 
 $(STATLIB):
-	# In some environments, ~/.cargo/bin might not be included in PATH, so we need
-	# to set it here to ensure cargo can be found.
-	if [ "$(NOT_CRAN)" != "true" ]; then \
-		export CARGO_HOME=$(CARGOTMP); \
-	fi && \
+	@# Check if pre-built library was downloaded by configure
+	@if [ -f "$(LIBDIR)/.prebuilt" ]; then \
+		echo "** Using pre-built Rust library"; \
+	else \
+		echo "** Building Rust library from source..."; \
+		if [ "$(NOT_CRAN)" != "true" ]; then \
+			export CARGO_HOME=$(CARGOTMP); \
+		fi && \
 		export PATH="$(PATH):$(HOME)/.cargo/bin" && \
-		cargo build --lib --release --manifest-path=./rust/Cargo.toml --target-dir=$(TARGET_DIR)
-	if [ "$(NOT_CRAN)" != "true" ]; then \
-		rm -Rf $(CARGOTMP) && \
-		rm -Rf $(LIBDIR)/build; \
+		cargo build --lib --release --manifest-path=./rust/Cargo.toml --target-dir=$(TARGET_DIR); \
+		if [ "$(NOT_CRAN)" != "true" ]; then \
+			rm -Rf $(CARGOTMP) && \
+			rm -Rf $(LIBDIR)/build; \
+		fi; \
 	fi
 
 C_clean:
-	rm -Rf $(SHLIB) $(STATLIB) $(OBJECTS)
+	rm -Rf $(SHLIB) $(OBJECTS)
 
 clean:
 	rm -Rf $(SHLIB) $(STATLIB) $(OBJECTS) $(TARGET_DIR)

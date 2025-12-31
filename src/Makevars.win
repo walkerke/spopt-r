@@ -1,4 +1,4 @@
-TARGET = $(subst 64,x86_64,$(subst 32,i686,$(WIN)))-pc-windows-gnu
+TARGET = x86_64-pc-windows-gnu
 TARGET_DIR = ./rust/target
 LIBDIR = $(TARGET_DIR)/$(TARGET)/release
 STATLIB = $(LIBDIR)/libspopt.a
@@ -11,28 +11,30 @@ $(SHLIB): $(STATLIB)
 CARGOTMP = $(CURDIR)/.cargo
 
 $(STATLIB):
-	mkdir -p $(TARGET_DIR)/libgcc_mock
-	# `rustc` adds `-lgcc_eh` flags to the compiler, but Rtools' GCC doesn't have
-	# `libgcc_eh` due to the compilation settings. So, in order to please the
-	# linker, we need to add empty `libgcc_eh.a`.
-	touch $(TARGET_DIR)/libgcc_mock/libgcc_eh.a
-
-	# CARGO_LINKER is provided in Makevars.ucrt for R >= 4.2
-	if [ "$(NOT_CRAN)" != "true" ]; then \
-		export CARGO_HOME=$(CARGOTMP); \
-	fi && \
+	@# Check if pre-built library was downloaded by configure.win
+	@if [ -f "$(LIBDIR)/.prebuilt" ]; then \
+		echo "** Using pre-built Rust library"; \
+	else \
+		echo "** Building Rust library from source..."; \
+		echo "** This requires LLVM and CMake to be installed"; \
+		mkdir -p $(TARGET_DIR)/libgcc_mock; \
+		touch $(TARGET_DIR)/libgcc_mock/libgcc_eh.a; \
+		if [ "$(NOT_CRAN)" != "true" ]; then \
+			export CARGO_HOME=$(CARGOTMP); \
+		fi && \
 		if [ -n "$(CARGO_LINKER)" ]; then \
 			export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER="$(CARGO_LINKER)"; \
 		fi && \
 		export LIBRARY_PATH="$${LIBRARY_PATH};$(CURDIR)/$(TARGET_DIR)/libgcc_mock" && \
-		cargo build --target=$(TARGET) --lib --release --manifest-path=./rust/Cargo.toml --target-dir=$(TARGET_DIR)
-	if [ "$(NOT_CRAN)" != "true" ]; then \
-		rm -Rf $(CARGOTMP) && \
-		rm -Rf $(LIBDIR)/build; \
+		cargo build --target=$(TARGET) --lib --release --manifest-path=./rust/Cargo.toml --target-dir=$(TARGET_DIR); \
+		if [ "$(NOT_CRAN)" != "true" ]; then \
+			rm -Rf $(CARGOTMP); \
+			rm -Rf $(LIBDIR)/build; \
+		fi; \
 	fi
 
 C_clean:
-	rm -Rf $(SHLIB) $(STATLIB) $(OBJECTS)
+	rm -Rf $(SHLIB) $(OBJECTS)
 
 clean:
 	rm -Rf $(SHLIB) $(STATLIB) $(OBJECTS) $(TARGET_DIR)

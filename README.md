@@ -40,9 +40,14 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 **Windows:**
-Windows support is not yet available. We recommend Windows users install via [WSL](https://learn.microsoft.com/en-us/windows/wsl/) using the Linux instructions above.
+Windows installation uses pre-built binaries and does not require Rust. Just install directly:
+```r
+pak::pak("walkerke/spopt-r")
+```
 
-After installation, restart your terminal/R session so `cargo` is on your PATH.
+If pre-built binaries are not yet available for your version, you can use [WSL](https://learn.microsoft.com/en-us/windows/wsl/) with the Linux instructions above.
+
+**macOS/Linux:** After Rust installation, restart your terminal/R session so `cargo` is on your PATH.
 
 ### Install Package
 
