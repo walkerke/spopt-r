@@ -23,3 +23,13 @@ tools/libspopt.a
 src/rust/vendor
 src/Makevars
 src/Makevars.win
+
+
+*.o
+*.so
+*.dll
+target
+.cargo
+rust/vendor
+Makevars
+Makevars.win
