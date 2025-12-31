@@ -30,33 +30,19 @@ Spatial Optimization for R. An R-native implementation of spatial optimization a
 
 ## Installation
 
-### System Requirements
-
-This package requires a Rust toolchain to compile the backend.
-
-**macOS/Linux:**
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-**Windows:**
-Windows installation uses pre-built binaries and does not require Rust. Just install directly:
-```r
-pak::pak("walkerke/spopt-r")
-```
-
-If pre-built binaries are not yet available for your version, you can use [WSL](https://learn.microsoft.com/en-us/windows/wsl/) with the Linux instructions above.
-
-**macOS/Linux:** After Rust installation, restart your terminal/R session so `cargo` is on your PATH.
-
-### Install Package
-
 ```r
 # install.packages("pak")
 pak::pak("walkerke/spopt-r")
 ```
 
-The first installation will compile the Rust code, which takes 1-2 minutes.
+**Windows:** Uses pre-built binaries - no additional setup required.
+
+**macOS/Linux:** Requires Rust. Install it first, then restart your terminal:
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+The first installation on macOS/Linux compiles the Rust backend, which takes 1-2 minutes.
 
 ## Usage
 
