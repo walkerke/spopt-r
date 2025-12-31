@@ -35,6 +35,11 @@ Spatial Optimization for R. An R-native implementation of spatial optimization a
 pak::pak("walkerke/spopt-r")
 ```
 
+Or from [r-universe](https://walkerke.r-universe.dev/spopt):
+```r
+install.packages("spopt", repos = "https://walkerke.r-universe.dev")
+```
+
 Pre-built binaries are available for all platforms - no Rust or compilation required.
 
 ## Usage
