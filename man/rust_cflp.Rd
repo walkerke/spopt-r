@@ -2,11 +2,25 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_cflp}
 \alias{rust_cflp}
-\title{Solve CFLP (Capacitated Facility Location Problem) (Rust)}
+\title{Solve Capacitated Facility Location Problem (CFLP)}
 \usage{
 rust_cflp(cost_matrix, weights, capacities, n_facilities, facility_costs)
 }
-\description{
-Solve CFLP (Capacitated Facility Location Problem) (Rust)
+\arguments{
+\item{cost_matrix}{Cost/distance matrix (demand x facilities)}
+
+\item{weights}{Demand weights}
+
+\item{capacities}{Capacity of each facility}
+
+\item{n_facilities}{Number of facilities to locate (0 if using facility costs)}
+
+\item{facility_costs}{Optional fixed cost to open each facility}
 }
-\keyword{internal}
+\value{
+List with selected facilities, assignments, utilizations
+}
+\description{
+Minimize weighted distance subject to facility capacity constraints.
+Supports fixed number of facilities or facility opening costs.
+}

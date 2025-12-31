@@ -2,11 +2,22 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_ward_constrained}
 \alias{rust_ward_constrained}
-\title{Solve spatially-constrained Ward clustering (Rust)}
+\title{Solve spatially-constrained Ward clustering}
 \usage{
 rust_ward_constrained(attrs, n_regions, adj_i, adj_j)
 }
-\description{
-Solve spatially-constrained Ward clustering (Rust)
+\arguments{
+\item{attrs}{Attribute matrix (n x p)}
+
+\item{n_regions}{Number of regions to create}
+
+\item{adj_i}{Row indices of adjacency (0-based)}
+
+\item{adj_j}{Column indices of adjacency (0-based)}
 }
-\keyword{internal}
+\value{
+List with labels, n_regions, objective
+}
+\description{
+Solve spatially-constrained Ward clustering
+}

@@ -8,7 +8,7 @@ crate-type = ["staticlib"]
 name = "spopt"
 
 [dependencies]
-extendr-api = "0.7"
+extendr-api = "0.8"
 
 # Graph operations (MST, connectivity)
 petgraph = "0.6"

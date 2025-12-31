@@ -2,11 +2,23 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_huff}
 \alias{rust_huff}
-\title{Compute Huff Model probabilities (Rust)}
+\title{Compute Huff Model probabilities}
 \usage{
 rust_huff(cost_matrix, attractiveness, distance_exponent, sales_potential)
 }
-\description{
-Compute Huff Model probabilities (Rust)
+\arguments{
+\item{cost_matrix}{Cost/distance matrix (demand x stores)}
+
+\item{attractiveness}{Attractiveness values for each store (pre-computed with exponents)}
+
+\item{distance_exponent}{Distance decay exponent (typically negative, e.g., -1.5)}
+
+\item{sales_potential}{Optional sales potential for each demand point}
 }
-\keyword{internal}
+\value{
+List with probabilities, market shares, expected sales
+}
+\description{
+Computes probability surface based on distance decay and attractiveness.
+Formula: P_ij = (A_j × D_ij^β) / Σ_k(A_k × D_ik^β)
+}

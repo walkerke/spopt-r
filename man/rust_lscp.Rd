@@ -2,11 +2,18 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_lscp}
 \alias{rust_lscp}
-\title{Solve LSCP problem (Rust)}
+\title{Solve LSCP (Location Set Covering Problem)}
 \usage{
 rust_lscp(cost_matrix, service_radius)
 }
-\description{
-Solve LSCP problem (Rust)
+\arguments{
+\item{cost_matrix}{Cost/distance matrix (demand x facilities)}
+
+\item{service_radius}{Maximum service distance}
 }
-\keyword{internal}
+\value{
+List with selected facilities and coverage
+}
+\description{
+Solve LSCP (Location Set Covering Problem)
+}

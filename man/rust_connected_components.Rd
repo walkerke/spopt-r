@@ -2,11 +2,20 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_connected_components}
 \alias{rust_connected_components}
-\title{Find connected components (Rust)}
+\title{Find connected components}
 \usage{
 rust_connected_components(i, j, n)
 }
-\description{
-Find connected components (Rust)
+\arguments{
+\item{i}{Row indices of adjacency matrix}
+
+\item{j}{Column indices of adjacency matrix}
+
+\item{n}{Number of nodes}
 }
-\keyword{internal}
+\value{
+Vector of component labels (0-based)
+}
+\description{
+Find connected components
+}

@@ -2,11 +2,28 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_skater}
 \alias{rust_skater}
-\title{Solve SKATER regionalization (Rust)}
+\title{Solve SKATER regionalization}
 \usage{
 rust_skater(attrs, adj_i, adj_j, n_regions, floor_var, floor_value, seed)
 }
-\description{
-Solve SKATER regionalization (Rust)
+\arguments{
+\item{attrs}{Attribute matrix (n x p)}
+
+\item{adj_i}{Row indices of adjacency}
+
+\item{adj_j}{Column indices of adjacency}
+
+\item{n_regions}{Number of regions to create}
+
+\item{floor_var}{Optional floor variable values}
+
+\item{floor_value}{Minimum floor value per region}
+
+\item{seed}{Random seed}
 }
-\keyword{internal}
+\value{
+Vector of region labels (1-based)
+}
+\description{
+Solve SKATER regionalization
+}

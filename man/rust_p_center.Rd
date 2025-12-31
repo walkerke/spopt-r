@@ -2,11 +2,18 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_p_center}
 \alias{rust_p_center}
-\title{Solve P-Center problem (Rust)}
+\title{Solve P-Center facility location problem}
 \usage{
 rust_p_center(cost_matrix, n_facilities)
 }
-\description{
-Solve P-Center problem (Rust)
+\arguments{
+\item{cost_matrix}{Cost/distance matrix (demand x facilities)}
+
+\item{n_facilities}{Number of facilities to locate}
 }
-\keyword{internal}
+\value{
+List with selected facilities, assignments, and max distance
+}
+\description{
+Solve P-Center facility location problem
+}

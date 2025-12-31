@@ -2,11 +2,22 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_mclp}
 \alias{rust_mclp}
-\title{Solve MCLP problem (Rust)}
+\title{Solve MCLP (Maximum Coverage Location Problem)}
 \usage{
 rust_mclp(cost_matrix, weights, service_radius, n_facilities)
 }
-\description{
-Solve MCLP problem (Rust)
+\arguments{
+\item{cost_matrix}{Cost/distance matrix (demand x facilities)}
+
+\item{weights}{Demand weights}
+
+\item{service_radius}{Maximum service distance}
+
+\item{n_facilities}{Number of facilities to locate}
 }
-\keyword{internal}
+\value{
+List with selected facilities and coverage
+}
+\description{
+Solve MCLP (Maximum Coverage Location Problem)
+}

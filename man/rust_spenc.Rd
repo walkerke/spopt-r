@@ -2,11 +2,26 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_spenc}
 \alias{rust_spenc}
-\title{Solve SPENC regionalization problem (Rust)}
+\title{Solve SPENC regionalization problem}
 \usage{
 rust_spenc(attrs, n_regions, adj_i, adj_j, gamma, seed)
 }
-\description{
-Solve SPENC regionalization problem (Rust)
+\arguments{
+\item{attrs}{Attribute matrix (n x p)}
+
+\item{n_regions}{Number of regions to create}
+
+\item{adj_i}{Row indices of adjacency (0-based)}
+
+\item{adj_j}{Column indices of adjacency (0-based)}
+
+\item{gamma}{RBF kernel parameter}
+
+\item{seed}{Random seed}
 }
-\keyword{internal}
+\value{
+List with labels, n_regions, objective
+}
+\description{
+Spatially-encouraged spectral clustering.
+}

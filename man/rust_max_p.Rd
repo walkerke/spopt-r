@@ -2,7 +2,7 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_max_p}
 \alias{rust_max_p}
-\title{Solve Max-P regionalization problem (Rust)}
+\title{Solve Max-P regionalization problem}
 \usage{
 rust_max_p(
   attrs,
@@ -21,7 +21,39 @@ rust_max_p(
   compact_weight
 )
 }
-\description{
-Solve Max-P regionalization problem (Rust)
+\arguments{
+\item{attrs}{Attribute matrix (n x p) for computing within-region dissimilarity}
+
+\item{threshold_var}{Values of the threshold variable (e.g., population)}
+
+\item{threshold}{Minimum sum required per region}
+
+\item{adj_i}{Row indices of adjacency (0-based)}
+
+\item{adj_j}{Column indices of adjacency (0-based)}
+
+\item{n_iterations}{Number of construction phase iterations}
+
+\item{n_sa_iterations}{Number of simulated annealing iterations}
+
+\item{cooling_rate}{SA cooling rate (e.g., 0.99)}
+
+\item{tabu_length}{Tabu list length for SA}
+
+\item{seed}{Random seed}
+
+\item{centroids_x}{X coordinates of unit centroids (for compactness)}
+
+\item{centroids_y}{Y coordinates of unit centroids (for compactness)}
+
+\item{compact}{Whether to optimize for compactness}
+
+\item{compact_weight}{Weight for compactness vs dissimilarity (0-1)}
 }
-\keyword{internal}
+\value{
+List with labels (1-based), n_regions, objective, and compactness
+}
+\description{
+Maximize the number of regions such that each region satisfies a minimum
+threshold constraint on a spatial extensive attribute.
+}

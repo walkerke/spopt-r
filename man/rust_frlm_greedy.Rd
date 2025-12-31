@@ -2,7 +2,7 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_frlm_greedy}
 \alias{rust_frlm_greedy}
-\title{Solve FRLM using greedy heuristic (Rust)}
+\title{Solve FRLM using greedy heuristic}
 \usage{
 rust_frlm_greedy(
   n_candidates,
@@ -14,7 +14,24 @@ rust_frlm_greedy(
   n_facilities
 )
 }
-\description{
-Solve FRLM using greedy heuristic (Rust)
+\arguments{
+\item{n_candidates}{Number of candidate facility locations}
+
+\item{path_candidates}{Flat array of candidate indices for each path}
+
+\item{path_offsets}{Start index for each path in path_candidates}
+
+\item{path_distances}{Distances to each candidate along paths}
+
+\item{flow_volumes}{Volume of each flow}
+
+\item{vehicle_range}{Maximum vehicle range}
+
+\item{n_facilities}{Number of facilities to place}
 }
-\keyword{internal}
+\value{
+List with selected facilities and coverage info
+}
+\description{
+Solve FRLM using greedy heuristic
+}

@@ -2,11 +2,22 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_distance_matrix_manhattan}
 \alias{rust_distance_matrix_manhattan}
-\title{Compute Manhattan distance matrix (Rust)}
+\title{Compute Manhattan distance matrix between two sets of points}
 \usage{
 rust_distance_matrix_manhattan(x1, y1, x2, y2)
 }
-\description{
-Compute Manhattan distance matrix (Rust)
+\arguments{
+\item{x1}{X coordinates of first set of points}
+
+\item{y1}{Y coordinates of first set of points}
+
+\item{x2}{X coordinates of second set of points}
+
+\item{y2}{Y coordinates of second set of points}
 }
-\keyword{internal}
+\value{
+Distance matrix (n1 x n2)
+}
+\description{
+Compute Manhattan distance matrix between two sets of points
+}

@@ -2,7 +2,7 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_azp}
 \alias{rust_azp}
-\title{Solve AZP regionalization problem (Rust)}
+\title{Solve AZP regionalization problem}
 \usage{
 rust_azp(
   attrs,
@@ -17,7 +17,30 @@ rust_azp(
   seed
 )
 }
-\description{
-Solve AZP regionalization problem (Rust)
+\arguments{
+\item{attrs}{Attribute matrix (n x p)}
+
+\item{n_regions}{Number of regions to create}
+
+\item{adj_i}{Row indices of adjacency (0-based)}
+
+\item{adj_j}{Column indices of adjacency (0-based)}
+
+\item{method}{"basic", "tabu", or "sa"}
+
+\item{max_iterations}{Maximum iterations}
+
+\item{tabu_length}{Tabu list length (for tabu method)}
+
+\item{cooling_rate}{SA cooling rate (for sa method)}
+
+\item{initial_temperature}{SA initial temperature (for sa method)}
+
+\item{seed}{Random seed}
 }
-\keyword{internal}
+\value{
+List with labels, n_regions, objective
+}
+\description{
+Automatic Zoning Procedure with basic, tabu, and SA variants.
+}

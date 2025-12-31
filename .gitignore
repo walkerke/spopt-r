@@ -20,3 +20,6 @@ tools/libspopt.a
 
 # Claude
 .claude
+src/rust/vendor
+src/Makevars
+src/Makevars.win
