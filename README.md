@@ -1,4 +1,4 @@
-# spopt <img src="man/figures/logo.png" align="right" height="139" />
+# spopt
 <!-- badges: start -->
 <!-- badges: end -->
 Spatial Optimization for R. An R-native implementation of spatial optimization algorithms, inspired by [Python spopt](https://pysal.org/spopt/).
