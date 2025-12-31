@@ -13,9 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
       - name: Install LLVM
         run: |
-          choco install llvm --version=18.1.8 -y
+          choco install llvm -y --force
           echo "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
 
       - name: Install Rust (GNU toolchain)
@@ -45,22 +48,27 @@ jobs:
           path: artifact/libspopt-x86_64-pc-windows-gnu.a
 
   build-macos-intel:
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
 
-      - name: Build Rust library
+      - name: Build Rust library (cross-compile for Intel)
         working-directory: src/rust
-        run: cargo build --release
+        run: cargo build --release --target x86_64-apple-darwin
 
       - name: Prepare artifact
         run: |
           mkdir -p artifact
-          cp src/rust/target/release/libspopt.a artifact/libspopt-x86_64-apple-darwin.a
+          cp src/rust/target/x86_64-apple-darwin/release/libspopt.a artifact/libspopt-x86_64-apple-darwin.a
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -69,10 +77,13 @@ jobs:
           path: artifact/libspopt-x86_64-apple-darwin.a
 
   build-macos-arm:
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -97,6 +108,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set up R
+        uses: r-lib/actions/setup-r@v2
 
       - name: Install system dependencies
         run: |
