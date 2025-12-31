@@ -15,5 +15,8 @@ src/.cargo/
 # Test artifacts
 tests/testthat/Rplots.pdf
 
+# Pre-built binaries (downloaded at build time per-platform)
+tools/libspopt.a
+
 # Claude
 .claude
