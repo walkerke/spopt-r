@@ -1,5 +1,0 @@
-target	sha256	url
-aarch64-apple-darwin	343a835bdc26daf3c14da6df229be7b3f882fc440cf70536103ab568079880f7	https://github.com/walkerke/spopt-r/releases/download/v0.1/libspopt-aarch64-apple-darwin.a
-x86_64-apple-darwin	e3a7e95e44aa3794ea3a8e9fde6594e513c67abaf73df7821c1db752cb911119	https://github.com/walkerke/spopt-r/releases/download/v0.1/libspopt-x86_64-apple-darwin.a
-x86_64-pc-windows-gnu	d599c09ed4e309ec0b174a8060cf069d7f99f3ca3a5c15afc24f4e1ae62bd3f3	https://github.com/walkerke/spopt-r/releases/download/v0.1/libspopt-x86_64-pc-windows-gnu.a
-x86_64-unknown-linux-gnu	140065c98287828a67acd0c439176748981567a09833ca6985c86c310b8a9835	https://github.com/walkerke/spopt-r/releases/download/v0.1/libspopt-x86_64-unknown-linux-gnu.a

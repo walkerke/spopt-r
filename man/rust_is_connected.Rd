@@ -2,11 +2,20 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_is_connected}
 \alias{rust_is_connected}
-\title{Check if graph is connected (Rust)}
+\title{Check if a graph is connected}
 \usage{
 rust_is_connected(i, j, n)
 }
-\description{
-Check if graph is connected (Rust)
+\arguments{
+\item{i}{Row indices of adjacency matrix}
+
+\item{j}{Column indices of adjacency matrix}
+
+\item{n}{Number of nodes}
 }
-\keyword{internal}
+\value{
+TRUE if connected, FALSE otherwise
+}
+\description{
+Check if a graph is connected
+}

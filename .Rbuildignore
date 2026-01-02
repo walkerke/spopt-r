@@ -8,3 +8,8 @@
 ^src/rust/\.cargo$
 ^src/rust/Cargo\.lock$
 ^\.claude$
+^\.vscode$
+^src/rust/vendor$
+^src/rust/target$
+^src/Makevars$
+^src/Makevars\.win$

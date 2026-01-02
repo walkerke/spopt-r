@@ -2,11 +2,18 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_p_dispersion}
 \alias{rust_p_dispersion}
-\title{Solve P-Dispersion problem (Rust)}
+\title{Solve P-Dispersion facility location problem}
 \usage{
 rust_p_dispersion(distance_matrix, n_facilities)
 }
-\description{
-Solve P-Dispersion problem (Rust)
+\arguments{
+\item{distance_matrix}{Distance matrix between facilities}
+
+\item{n_facilities}{Number of facilities to select}
 }
-\keyword{internal}
+\value{
+List with selected facilities and min distance
+}
+\description{
+Solve P-Dispersion facility location problem
+}

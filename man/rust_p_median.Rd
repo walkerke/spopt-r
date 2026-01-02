@@ -2,11 +2,20 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_p_median}
 \alias{rust_p_median}
-\title{Solve P-Median problem (Rust)}
+\title{Solve P-Median facility location problem}
 \usage{
 rust_p_median(cost_matrix, weights, n_facilities)
 }
-\description{
-Solve P-Median problem (Rust)
+\arguments{
+\item{cost_matrix}{Cost/distance matrix (demand x facilities)}
+
+\item{weights}{Demand weights}
+
+\item{n_facilities}{Number of facilities to locate (p)}
 }
-\keyword{internal}
+\value{
+List with selected facilities and assignments
+}
+\description{
+Solve P-Median facility location problem
+}

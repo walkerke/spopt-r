@@ -2,11 +2,22 @@
 % Please edit documentation in R/extendr-wrappers.R
 \name{rust_mst}
 \alias{rust_mst}
-\title{Compute minimum spanning tree (Rust)}
+\title{Compute minimum spanning tree from adjacency matrix}
 \usage{
 rust_mst(i, j, weights, n)
 }
-\description{
-Compute minimum spanning tree (Rust)
+\arguments{
+\item{i}{Row indices (0-based) of adjacency matrix non-zero entries}
+
+\item{j}{Column indices (0-based) of adjacency matrix non-zero entries}
+
+\item{weights}{Edge weights (distances/dissimilarities)}
+
+\item{n}{Number of nodes}
 }
-\keyword{internal}
+\value{
+List with MST edges (from, to, weight)
+}
+\description{
+Compute minimum spanning tree from adjacency matrix
+}
