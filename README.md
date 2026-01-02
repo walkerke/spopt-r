@@ -30,17 +30,28 @@ Spatial Optimization for R. An R-native implementation of spatial optimization a
 
 ## Installation
 
-```r
-# install.packages("pak")
-pak::pak("walkerke/spopt-r")
-```
+### From r-universe (recommended)
 
-Or from [r-universe](https://walkerke.r-universe.dev/spopt):
+Pre-built binaries are available for all platforms - no Rust toolchain required:
+
 ```r
 install.packages("spopt", repos = "https://walkerke.r-universe.dev")
 ```
 
-Pre-built binaries are available for all platforms - no Rust or compilation required.
+### From source
+
+Building from source requires:
+- **Rust** (>= 1.70) with cargo
+- **CMake**
+- **libclang** (for bindgen)
+  - macOS: Included with Xcode Command Line Tools
+  - Linux: `sudo apt install libclang-dev`
+  - Windows: `winget install LLVM.LLVM` and set `LIBCLANG_PATH=C:\Program Files\LLVM\bin`
+
+```r
+# install.packages("pak")
+pak::pak("walkerke/spopt-r")
+```
 
 ## Usage
 
