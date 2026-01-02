@@ -41,6 +41,17 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
 
+      - name: Install clang via Rtools MSYS2 (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # Install clang via Rtools45 MSYS2 pacman (after Rtools is installed)
+          C:\rtools45\usr\bin\bash.exe -l -c "pacman -Sy --noconfirm mingw-w64-x86_64-clang"
+          # Set LIBCLANG_PATH for bindgen
+          echo "LIBCLANG_PATH=C:\rtools45\mingw64\bin" >> $env:GITHUB_ENV
+          # Also add to PATH
+          echo "C:\rtools45\mingw64\bin" >> $env:GITHUB_PATH
+        shell: pwsh
+
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::rcmdcheck
