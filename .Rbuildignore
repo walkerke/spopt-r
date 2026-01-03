@@ -13,3 +13,4 @@
 ^src/rust/target$
 ^src/Makevars$
 ^src/Makevars\.win$
+^tools/libspopt\.a$
