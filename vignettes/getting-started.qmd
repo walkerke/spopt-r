@@ -1,0 +1,94 @@
+---
+title: "Getting started with spopt"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+options(tigris_use_cache = TRUE)
+```
+
+spopt provides R-native implementations of spatial optimization algorithms for regionalization, facility location, and market analysis. The package is designed as an alternative to Python's PySAL spopt library, bringing these powerful algorithms to R users with an sf-first API and a Rust backend for performance.
+
+### Installation
+
+The easiest way to install spopt is from my r-universe repository, which provides pre-built binaries:
+
+```{r}
+#| eval: false
+install.packages("spopt", repos = "https://walkerke.r-universe.dev")
+```
+
+Once installed, load the package along with sf for spatial data handling and tidyverse for data manipulation:
+
+```{r}
+#| eval: false
+library(spopt)
+library(sf)
+library(tidyverse)
+```
+
+### What can spopt do?
+
+spopt includes three families of spatial optimization algorithms:
+
+**Regionalization**: Build spatially-contiguous regions from smaller geographies. This is useful when you need to aggregate Census blocks into larger areas, create balanced sales territories, or design compact political districts. Algorithms include SKATER, AZP, Max-P, SPENC, and spatially-constrained Ward clustering.
+
+**Facility location**: Find optimal locations for facilities given demand points and candidate sites. Whether you're siting fire stations to minimize response times, placing retail stores to maximize coverage, or locating EV charging stations along highway corridors, spopt has algorithms for these problems. Options include P-Median, P-Center, MCLP, LSCP, CFLP, P-Dispersion, and FRLM.
+
+**Market analysis**: Model consumer behavior and market competition with the Huff model. This classic retail gravity model predicts market share and expected sales based on store attractiveness and distance to consumers.
+
+### A quick example
+
+Let's run a quick facility location analysis to see spopt in action. We'll find optimal locations for 5 facilities to serve Census tracts in Tarrant County, Texas (home of Fort Worth).
+
+```{r}
+#| eval: false
+library(spopt)
+library(tidycensus)
+
+# Get population data for Tarrant County tracts
+tarrant <- get_acs(
+  geography = "tract",
+  variables = "B01003_001",
+  state = "TX",
+  county = "Tarrant",
+  geometry = TRUE,
+  year = 2023
+)
+
+# Use tract centroids as both demand points and candidate facility sites
+tarrant_pts <- tarrant |>
+  st_centroid() |>
+  filter(!is.na(estimate))
+
+# Solve the P-Median problem: minimize total weighted distance
+result <- p_median(
+  demand = tarrant_pts,
+  facilities = tarrant_pts,
+  n_facilities = 5,
+  weight_col = "estimate"
+)
+
+# View selected facility locations
+result$facilities |> filter(.selected)
+```
+
+The `p_median()` function returns a list with allocated demand points and selected facilities. Each demand point is assigned to its nearest selected facility, and the solution minimizes the total population-weighted distance.
+
+### SF-first design
+
+All spopt functions accept and return sf objects. This means you can:
+
+-   Pass sf polygons or points directly to functions
+-   Use any coordinate reference system (functions handle transformations internally)
+-   Pipe results directly into visualization with ggplot2, mapview, or mapgl
+-   Integrate seamlessly with tidycensus, tigris, and other spatial R packages
+
+### Next steps
+
+-   [Regionalization](regionalization.html) - Build spatially-contiguous regions with SKATER, AZP, Max-P, and more
+-   [Facility Location](facility-location.html) - Solve location-allocation problems with P-Median, MCLP, and other algorithms
+-   [Huff Model](huff-model.html) - Model market share and retail competition
+-   [Travel-Time Cost Matrices](travel-time-matrices.html) - Use real-world travel times with r5r and other routing engines

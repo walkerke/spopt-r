@@ -10,6 +10,7 @@ p_center(
   n_facilities,
   cost_matrix = NULL,
   distance_metric = "euclidean",
+  method = c("binary_search", "mip"),
   verbose = FALSE
 )
 }
@@ -23,6 +24,9 @@ p_center(
 \item{cost_matrix}{Optional. Pre-computed distance matrix.}
 
 \item{distance_metric}{Distance metric: "euclidean" (default) or "manhattan".}
+
+\item{method}{Algorithm to use: "binary_search" (default, faster) or "mip"
+(direct mixed-integer programming formulation).}
 
 \item{verbose}{Logical. Print solver progress.}
 }
@@ -45,7 +49,17 @@ The p-center problem minimizes the maximum distance between any demand point
 and its assigned facility. This "minimax" objective ensures equitable access
 by focusing on the worst-served location rather than average performance.
 
-The integer programming formulation is:
+Two algorithms are available:
+\itemize{
+\item \code{"binary_search"} (default): Binary search over distances with set
+covering subproblems. This converts the difficult minimax objective into
+simpler feasibility problems and is typically much faster.
+\item \code{"mip"}: Direct mixed-integer programming formulation with the
+minimax objective. Can be slower but may be preferred for small problems
+or when exact optimality certificates are needed.
+}
+
+The direct MIP formulation is:
 \deqn{\min W}
 Subject to:
 \deqn{\sum_j y_j = p}

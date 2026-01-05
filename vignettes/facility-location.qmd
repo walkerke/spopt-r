@@ -1,0 +1,388 @@
+---
+title: "Facility location with spopt"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+options(tigris_use_cache = TRUE)
+```
+
+*Facility location* problems ask: given a set of demand points and candidate facility sites, where should we place facilities to best serve demand? These problems arise across industries - siting fire stations to minimize emergency response times, placing retail stores to maximize customer coverage, or locating warehouses to minimize shipping distances.
+
+spopt implements several classic facility location algorithms, each optimizing a different objective. This vignette demonstrates these algorithms using Census data from Tarrant County, Texas (home of Fort Worth), showing how to select optimal locations for public services.
+
+## Setting up the problem
+
+Facility location problems have three core components:
+
+1.  **Demand points**: Locations that need to be served (e.g., population centers, customer addresses)
+2.  **Candidate facilities**: Potential sites where facilities could be built
+3.  **Cost matrix**: Distance or travel time between each demand point and candidate facility
+
+A key distinction: in practice, you typically have *many* demand points but *few* candidate facility sites. For example, you might need to serve 500 Census tracts but only have 25 potential building sites to choose from. This asymmetry is what makes the problem tractable - the solver selects from a limited set of candidates rather than considering every possible location.
+
+Let's set up a realistic scenario: we want to place community health centers to serve the population of Tarrant County. We'll use Census tract centroids as demand points, and sample 30 candidate locations from across the county to represent potential facility sites.
+
+```{r}
+#| eval: false
+library(spopt)
+library(tidycensus)
+library(tidyverse)
+library(sf)
+
+# Get tract-level population data
+tarrant <- get_acs(
+  geography = "tract",
+  variables = "B01003_001",
+  state = "TX",
+  county = "Tarrant",
+  geometry = TRUE,
+  year = 2023
+) |>
+  filter(estimate > 0) |>
+  rename(population = estimate)
+
+# Demand points: all tract centroids
+demand_pts <- tarrant |>
+  st_centroid()
+
+# Candidate facilities: sample 30 locations across the county
+# In practice, these might be specific parcels, existing buildings, or zoned commercial sites
+set.seed(1983)
+n_candidates <- 30
+
+county_boundary <- tarrant |> st_union()
+candidate_pts <- st_sample(county_boundary, n_candidates) |>
+  st_as_sf() |>
+  mutate(id = row_number())
+```
+
+```{r}
+#| echo: false
+#| eval: true
+library(spopt)
+library(tidycensus)
+library(tidyverse)
+library(sf)
+
+tarrant <- get_acs(
+  geography = "tract",
+  variables = "B01003_001",
+  state = "TX",
+  county = "Tarrant",
+  geometry = TRUE,
+  year = 2022
+) |>
+  filter(estimate > 0) |>
+  rename(population = estimate)
+
+demand_pts <- tarrant |>
+  st_centroid()
+
+set.seed(1983)
+n_candidates <- 30
+
+county_boundary <- tarrant |> st_union()
+candidate_pts <- st_sample(county_boundary, n_candidates) |>
+  st_as_sf() |>
+  mutate(id = row_number())
+```
+
+We now have `r nrow(demand_pts)` demand points (tract centroids) and `r n_candidates` candidate facility locations. This setup mirrors real-world planning where you're evaluating a shortlist of potential sites.
+
+```{r}
+#| eval: false
+library(mapgl)
+
+# Visualize the setup
+maplibre(bounds = tarrant) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tarrant,
+    fill_color = "lightgray",
+    fill_opacity = 0.3
+  ) |>
+  add_circle_layer(
+    id = "demand",
+    source = demand_pts,
+    circle_color = "steelblue",
+    circle_radius = 3,
+    circle_opacity = 0.5
+  ) |>
+  add_circle_layer(
+    id = "candidates",
+    source = candidate_pts,
+    circle_color = "black",
+    circle_radius = 6,
+    circle_stroke_color = "white",
+    circle_stroke_width = 2
+  )
+```
+
+![*Screenshot: Problem setup - demand points (blue) and candidate facilities (black)*](images/facility-setup.png)
+
+## P-Median: Minimizing total distance
+
+The *P-Median* problem minimizes the total weighted distance from demand points to their assigned facilities. This is the classic efficiency-focused location model - it finds locations that minimize how far people, on average, must travel.
+
+```{r}
+#| eval: false
+result_pmedian <- p_median(
+  demand = demand_pts,
+  facilities = candidate_pts,
+  n_facilities = 5,
+  weight_col = "population"
+)
+```
+
+The solver runs quickly with 30 candidates - the optimization scales with the number of candidate sites, not demand points. Let's visualize the results:
+
+```{r}
+#| eval: false
+# Get selected facility locations
+selected <- result_pmedian$facilities |>
+  filter(.selected)
+
+# Color demand points by their assigned facility
+demand_colored <- result_pmedian$demand |>
+  mutate(.facility = as.character(.facility))
+
+# Map the results
+maplibre(bounds = tarrant) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tarrant,
+    fill_color = "lightgray",
+    fill_opacity = 0.3
+  ) |>
+  add_circle_layer(
+    id = "demand",
+    source = demand_colored,
+    circle_color = match_expr(
+      column = ".facility",
+      values = as.character(selected$id),
+      stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
+    ),
+    circle_radius = 4,
+    circle_opacity = 0.7
+  ) |>
+  add_markers(
+    data = selected,
+    color = "black"
+  )
+```
+
+![*Screenshot: P-Median solution with 5 facilities - demand points colored by facility assignment*](images/pmedian-result.png)
+
+Each demand point is colored by its assigned facility, and the black markers show the selected facility locations. The solution minimizes the total population-weighted distance.
+
+You can access solution metadata through the `spopt` attribute:
+
+```{r}
+#| eval: false
+attr(result_pmedian, "spopt")
+```
+
+```         
+$algorithm
+[1] "P-Median"
+
+$n_facilities
+[1] 5
+
+$objective
+[1] 234567890
+```
+
+The `objective` value represents the total weighted distance - lower is better.
+
+## P-Center: Minimizing maximum distance
+
+While P-Median optimizes *average* accessibility, the *P-Center* problem focuses on *equity* - it minimizes the maximum distance any demand point must travel. This is critical for emergency services where we need to guarantee that *everyone* is within a reasonable distance.
+
+```{r}
+#| eval: false
+result_pcenter <- p_center(
+  demand = demand_pts,
+  facilities = candidate_pts,
+  n_facilities = 5
+)
+
+selected_pcenter <- result_pcenter$facilities |>
+  filter(.selected)
+
+# Compare to P-Median locations
+maplibre(bounds = tarrant) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tarrant,
+    fill_color = "lightgray",
+    fill_opacity = 0.3
+  ) |>
+  add_markers(
+    data = selected,
+    color = "blue"
+  ) |>
+  add_markers(
+    data = selected_pcenter,
+    color = "red"
+  )
+```
+
+![*Screenshot: Comparing P-Median (blue) and P-Center (red) facility locations*](images/pcenter-comparison.png)
+
+Notice how the P-Center solution (red markers) pushes facilities toward the edges of the county to ensure no one is too far away, while P-Median (blue) concentrates facilities where population is densest.
+
+## MCLP: Maximum coverage with limited facilities
+
+The *Maximum Coverage Location Problem* (MCLP) maximizes the demand covered within a service radius when you can only build a fixed number of facilities. This is useful when you have budget constraints but want to cover as many people as possible.
+
+```{r}
+#| eval: false
+result_mclp <- mclp(
+  demand = demand_pts,
+  facilities = candidate_pts,
+  n_facilities = 5,
+  service_radius = 5000,  # 5 km
+  weight_col = "population"
+)
+
+# Calculate coverage
+covered_pop <- result_mclp$demand |>
+  filter(.covered) |>
+  pull(population) |>
+  sum()
+
+total_pop <- sum(demand_pts$population, na.rm = TRUE)
+
+cat(sprintf("Coverage: %s of %s (%.1f%%)",
+            format(covered_pop, big.mark = ","),
+            format(total_pop, big.mark = ","),
+            100 * covered_pop / total_pop))
+```
+
+The `service_radius` parameter defines what "covered" means - any demand point within this distance of a selected facility is considered covered. The algorithm then selects facilities to maximize the total covered population.
+
+## LSCP: Minimum facilities for full coverage
+
+The *Location Set Covering Problem* (LSCP) asks the opposite question from MCLP: what's the minimum number of facilities needed to cover *all* demand within a service radius?
+
+```{r}
+#| eval: false
+result_lscp <- lscp(
+  demand = demand_pts,
+  facilities = candidate_pts,
+  service_radius = 8000  # 8 km
+)
+
+n_selected <- sum(result_lscp$facilities$.selected)
+cat(sprintf("Minimum facilities needed for full coverage: %d", n_selected))
+```
+
+LSCP is particularly useful for planning emergency services where coverage is mandatory - every resident must be within a certain response time of a fire station or hospital.
+
+## P-Dispersion: Spreading facilities apart
+
+Most facility location problems assume demand points want to be *close* to facilities. But some facilities are *obnoxious* - landfills, prisons, or polluting industries that communities want far away. The *P-Dispersion* problem maximizes the minimum distance between facilities.
+
+P-Dispersion is also useful for environmental monitoring networks or cell tower placement where you want sensors spread across a region.
+
+```{r}
+#| eval: false
+result_pdispersion <- p_dispersion(
+  facilities = candidate_pts,
+  n_facilities = 10
+)
+
+selected_disp <- result_pdispersion |>
+  filter(.selected)
+
+maplibre(bounds = tarrant) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tarrant,
+    fill_color = "lightgray",
+    fill_opacity = 0.3
+  ) |>
+  add_markers(data = selected_disp)
+```
+
+![*Screenshot: P-Dispersion solution with 10 maximally spread facilities*](images/pdispersion-result.png)
+
+Notice how the facilities are spread around the county's perimeter and interior - maximizing the minimum inter-facility distance.
+
+## CFLP: Capacitated facility location
+
+Real facilities have capacity limits - a clinic can only see so many patients per day, a warehouse can only store so much inventory. The *Capacitated Facility Location Problem* (CFLP) adds capacity constraints and allows demand to be split across multiple facilities.
+
+```{r}
+#| eval: false
+# Add capacity to candidate facilities
+candidate_facilities <- candidate_pts |>
+  mutate(capacity = 100000)  # Each facility can serve 100,000 people
+
+result_cflp <- cflp(
+  demand = demand_pts,
+  facilities = candidate_facilities,
+  n_facilities = 5,
+  weight_col = "population",
+  capacity_col = "capacity"
+)
+```
+
+In CFLP, demand can be split - a tract's population might be served by multiple facilities if the nearest one is at capacity. The solution ensures no facility exceeds its capacity while minimizing total transportation cost.
+
+## Comparing algorithms
+
+Here's a quick reference for choosing the right algorithm:
+
+| Algorithm | Objective | Use case |
+|-----------------|---------------------------|-----------------------------|
+| **P-Median** | Minimize total weighted distance | General efficiency; warehouses, retail |
+| **P-Center** | Minimize maximum distance | Equity-focused; emergency services |
+| **MCLP** | Maximize covered demand | Fixed budget; expand coverage |
+| **LSCP** | Minimize facilities for full coverage | Mandatory coverage; emergency planning |
+| **P-Dispersion** | Maximize minimum inter-facility dist. | Obnoxious facilities; monitoring networks |
+| **CFLP** | Minimize cost with capacity limits | Logistics; realistic capacity constraints |
+
+For most public service planning, start with **P-Median** for an efficiency baseline, then compare to **P-Center** to see the equity trade-offs. If you have a hard budget constraint, **MCLP** helps understand what coverage is achievable with limited facilities.
+
+## Candidate site selection strategies
+
+The examples above used randomly sampled candidate locations. In practice, you'd generate candidates more thoughtfully:
+
+-   **Existing infrastructure**: Current facility locations that could be expanded
+-   **Zoning-based**: Sites zoned for commercial or institutional use
+-   **Network nodes**: Major intersections or highway interchanges
+-   **Population centers**: Centroids of high-density areas
+-   **Grid sampling**: Regular grid across the study area for exploratory analysis
+
+You can also combine strategies - start with a coarse grid of candidates for initial analysis, then refine to specific parcels for detailed planning.
+
+## Using custom cost matrices
+
+By default, spopt calculates Euclidean distances between points. But real-world accessibility depends on road networks and travel times, not straight-line distance. All facility location functions accept a `cost_matrix` parameter for custom distances.
+
+See the [Travel-Time Cost Matrices](travel-time-matrices.html) vignette for how to generate travel time matrices using r5r, and then pass them to these functions.
+
+```{r}
+#| eval: false
+# Example with custom cost matrix
+cost_mat <- my_travel_time_matrix  # Generated from r5r or similar
+
+result <- p_median(
+  demand = demand_pts,
+  facilities = candidate_pts,
+  n_facilities = 5,
+  weight_col = "population",
+  cost_matrix = cost_mat
+)
+```
+
+## Next steps
+
+-   [Regionalization](regionalization.html) - Build spatially-contiguous regions
+-   [Huff Model](huff-model.html) - Model market share and retail competition
+-   [Travel-Time Cost Matrices](travel-time-matrices.html) - Use real-world travel times with r5r

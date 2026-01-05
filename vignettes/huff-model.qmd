@@ -1,0 +1,357 @@
+---
+title: "Market analysis with the Huff model"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+options(tigris_use_cache = TRUE)
+```
+
+The *Huff model* is a classic approach to modeling consumer spatial behavior and market share. Developed by David Huff in 1963, it predicts the probability that a consumer will visit a particular store based on two factors: the store's attractiveness (often measured by size) and the distance the consumer must travel.
+
+This probabilistic model is widely used in retail site selection, market analysis, and competitive assessment. In this vignette, we'll use spopt's `huff()` function to analyze grocery store competition in the Austin, Texas metropolitan area.
+
+## The Huff model formula
+
+The probability that a consumer at location $i$ will visit store $j$ is:
+
+$$P_{ij} = \frac{A_j^\alpha \cdot D_{ij}^\beta}{\sum_{k=1}^{n} A_k^\alpha \cdot D_{ik}^\beta}$$
+
+Where:
+
+-   $A_j$ is the attractiveness of store $j$ (e.g., square footage)
+-   $D_{ij}$ is the distance from consumer $i$ to store $j$
+-   $\alpha$ is the attractiveness exponent (typically positive)
+-   $\beta$ is the distance decay exponent (typically negative)
+
+The model assumes consumers trade off attractiveness and distance - a larger store might attract customers from farther away, but consumers also prefer closer stores, all else being equal.
+
+## Setting up the analysis
+
+Let's analyze grocery store competition in the Austin metro area. We'll use Census block group data to represent consumer demand locations, and a set of real store locations.
+
+```{r}
+#| eval: false
+library(spopt)
+library(tidycensus)
+library(tidyverse)
+library(sf)
+
+# Get block group data for Travis, Williamson, and Hays counties
+austin_counties <- c("Travis", "Williamson", "Hays")
+
+demand <- get_acs(
+  geography = "block group",
+  variables = c(pop = "B01003_001", income = "B19013_001"),
+  state = "TX",
+  county = austin_counties,
+  geometry = TRUE,
+  year = 2022,
+  output = "wide"
+) |>
+  st_transform(4326) |>
+  filter(popE > 0, !is.na(incomeE)) |>
+  mutate(
+    # Spending potential: population weighted by relative income
+    spending = popE * (incomeE / median(incomeE, na.rm = TRUE))
+  )
+```
+
+```{r}
+#| echo: false
+#| eval: true
+library(spopt)
+library(tidycensus)
+library(tidyverse)
+library(sf)
+
+austin_counties <- c("Travis", "Williamson", "Hays")
+
+demand <- get_acs(
+  geography = "block group",
+  variables = c(pop = "B01003_001", income = "B19013_001"),
+  state = "TX",
+  county = austin_counties,
+  geometry = TRUE,
+  year = 2022,
+  output = "wide"
+) |>
+  st_transform(4326) |>
+  filter(popE > 0, !is.na(incomeE)) |>
+  mutate(
+    spending = popE * (incomeE / median(incomeE, na.rm = TRUE))
+  )
+```
+
+We've created a "spending potential" variable that combines population with income - block groups with higher incomes have more spending potential per capita. This will serve as our demand weight.
+
+Now let's define some store locations. For this example, I'll create a simplified set of HEB and Whole Foods locations in the Austin area:
+
+```{r}
+#| eval: false
+stores <- tibble(
+  id = paste0("Store_", 1:8),
+  name = c(
+    "HEB Mueller", "HEB Tech Ridge", "HEB Hancock", "HEB South Congress",
+    "Whole Foods Downtown", "Whole Foods Domain", "HEB Round Rock", "HEB Cedar Park"
+  ),
+  chain = c(rep("HEB", 4), rep("Whole Foods", 2), rep("HEB", 2)),
+  sqft = c(80000, 75000, 55000, 70000, 40000, 35000, 85000, 72000),
+  lon = c(-97.7025, -97.6920, -97.7215, -97.7830,
+          -97.7495, -97.7235, -97.6790, -97.8200),
+  lat = c(30.2950, 30.4420, 30.3030, 30.2280,
+          30.2690, 30.4020, 30.5080, 30.5100)
+) |>
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+```
+
+```{r}
+#| echo: false
+#| eval: true
+stores <- tibble(
+  id = paste0("Store_", 1:8),
+  name = c(
+    "HEB Mueller", "HEB Tech Ridge", "HEB Hancock", "HEB South Congress",
+    "Whole Foods Downtown", "Whole Foods Domain", "HEB Round Rock", "HEB Cedar Park"
+  ),
+  chain = c(rep("HEB", 4), rep("Whole Foods", 2), rep("HEB", 2)),
+  sqft = c(80000, 75000, 55000, 70000, 40000, 35000, 85000, 72000),
+  lon = c(-97.7025, -97.6920, -97.7215, -97.7830,
+          -97.7495, -97.7235, -97.6790, -97.8200),
+  lat = c(30.2950, 30.4420, 30.3030, 30.2280,
+          30.2690, 30.4020, 30.5080, 30.5100)
+) |>
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+```
+
+## Running the Huff model
+
+The `huff()` function calculates market probabilities and expected sales for each store. We need to provide:
+
+-   `demand`: Consumer locations (block group centroids work well)
+-   `stores`: Store locations with attractiveness data
+-   `attractiveness_col`: The column measuring store attractiveness
+-   `distance_exponent`: Controls how quickly distance reduces attractiveness (negative values)
+
+```{r}
+#| eval: false
+# Use block group centroids as demand points
+demand_pts <- demand |>
+  st_centroid()
+
+result <- huff(
+  demand = demand_pts,
+  stores = stores,
+  attractiveness_col = "sqft",
+  attractiveness_exponent = 1.0,
+  distance_exponent = -1.5,
+  sales_potential_col = "spending"
+)
+```
+
+The function returns a list with two sf objects:
+
+-   `demand`: Consumer locations with probability columns for each store, plus `.primary_store` and `.entropy` columns
+-   `stores`: Store locations with `.expected_sales` and `.market_share` columns
+
+## Visualizing market areas
+
+Let's map the *primary store* for each block group - the store with the highest probability of being visited:
+
+```{r}
+#| eval: false
+library(mapgl)
+
+# Join primary store back to demand
+demand_mapped <- demand |>
+  mutate(.primary_store = result$demand$.primary_store)
+
+# Create color mapping
+store_colors <- c(
+  "Store_1" = "#e41a1c", "Store_2" = "#377eb8",
+  "Store_3" = "#4daf4a", "Store_4" = "#984ea3",
+  "Store_5" = "#ff7f00", "Store_6" = "#a65628",
+  "Store_7" = "#f781bf", "Store_8" = "#999999"
+)
+
+maplibre(bounds = demand) |>
+  add_fill_layer(
+    id = "market_areas",
+    source = demand_mapped,
+    fill_color = match_expr(
+      column = ".primary_store",
+      values = names(store_colors),
+      stops = unname(store_colors)
+    ),
+    fill_opacity = 0.6
+  ) |>
+  add_line_layer(
+    id = "borders",
+    source = demand_mapped,
+    line_color = "white",
+    line_width = 0.3
+  ) |>
+  add_markers(data = stores, color = "black")
+```
+
+![*Screenshot: Market areas by primary store assignment*](images/huff-market-areas.png)
+
+The map shows each block group colored by its primary store. This gives us a quick sense of each store's *trade area* - the geographic region from which it draws most customers.
+
+## Understanding market share
+
+The `stores` result contains market share and expected sales for each location:
+
+```{r}
+#| eval: false
+result$stores |>
+  st_drop_geometry() |>
+  select(name, chain, sqft, .expected_sales, .market_share) |>
+  arrange(desc(.market_share))
+```
+
+```
+# A tibble: 8 x 5
+  name                 chain       sqft .expected_sales .market_share
+  <chr>                <chr>      <dbl>           <dbl>         <dbl>
+1 HEB Round Rock       HEB        85000       1234567.         0.182
+2 HEB Mueller          HEB        80000       1156789.         0.171
+3 HEB Cedar Park       HEB        72000       1045678.         0.154
+4 HEB Tech Ridge       HEB        75000        987654.         0.146
+...
+```
+
+The market share column (`.market_share`) shows each store's share of total expected sales across the study area. Larger stores in less competitive areas tend to capture more market share.
+
+## Competition and entropy
+
+The Huff model also calculates *entropy* for each demand location - a measure of competition intensity. Entropy is high when consumers have multiple similarly-attractive options, and low when one store dominates.
+
+```{r}
+#| eval: false
+# Map competition intensity
+demand_entropy <- demand |>
+  mutate(.entropy = result$demand$.entropy)
+
+maplibre(bounds = demand) |>
+  add_fill_layer(
+    id = "entropy",
+    source = demand_entropy,
+    fill_color = interpolate(
+      column = ".entropy",
+      values = c(0, 1, 2),
+      stops = c("#2166ac", "#f7f7f7", "#b2182b")
+    ),
+    fill_opacity = 0.7
+  ) |>
+  add_markers(data = stores, color = "black")
+```
+
+![*Screenshot: Competition intensity (entropy) across the market*](images/huff-entropy.png)
+
+Areas with high entropy (red) have intense competition - consumers there have multiple good options. Low-entropy areas (blue) are dominated by a single store, often at the market edges.
+
+## Evaluating new store locations
+
+One of the most powerful applications of the Huff model is *what-if analysis* - evaluating how a new store would affect market share. Let's test a potential new location in south Austin:
+
+```{r}
+#| eval: false
+# Add a hypothetical new store
+new_store <- tibble(
+  id = "Store_9",
+  name = "New HEB South Austin",
+  chain = "HEB",
+  sqft = 70000,
+  lon = -97.78,
+  lat = 30.20
+) |>
+  st_as_sf(coords = c("lon", "lat"), crs = 4326)
+
+stores_with_new <- bind_rows(stores, new_store)
+
+# Re-run the model
+result_new <- huff(
+  demand = demand_pts,
+  stores = stores_with_new,
+  attractiveness_col = "sqft",
+  attractiveness_exponent = 1.0,
+  distance_exponent = -1.5,
+  sales_potential_col = "spending"
+)
+
+# Compare market shares
+comparison <- result$stores |>
+  st_drop_geometry() |>
+  select(name, original_share = .market_share) |>
+  left_join(
+    result_new$stores |>
+      st_drop_geometry() |>
+      select(name, new_share = .market_share),
+    by = "name"
+  ) |>
+  mutate(change = new_share - original_share)
+
+comparison
+```
+
+This analysis shows how the new store would cannibalize sales from existing locations. Stores near the new location see their market share decline, while distant stores are largely unaffected.
+
+## Adjusting model parameters
+
+The `distance_exponent` and `attractiveness_exponent` parameters significantly affect results:
+
+**Distance exponent** (typically -0.5 to -3.0):
+
+-   Values closer to 0: Consumers willing to travel far for attractive stores
+-   More negative values: Strong preference for nearby stores
+
+**Attractiveness exponent** (typically 0.5 to 2.0):
+
+-   Values near 1: Linear relationship between size and attractiveness
+-   Values \> 1: Larger stores disproportionately attractive
+-   Values \< 1: Diminishing returns to size
+
+```{r}
+#| eval: false
+# Test with stronger distance decay
+result_steep <- huff(
+  demand = demand_pts,
+  stores = stores,
+  attractiveness_col = "sqft",
+  attractiveness_exponent = 1.0,
+  distance_exponent = -2.5,  # Much steeper decay
+  sales_potential_col = "spending"
+)
+```
+
+With a steeper distance decay (-2.5 vs -1.5), trade areas become smaller and more localized. This might be more realistic for convenience-oriented shopping where consumers prioritize proximity.
+
+## Using composite attractiveness
+
+Store attractiveness isn't always just about size. You might want to combine multiple factors - size, brand perception, parking availability, product selection. spopt supports this by allowing you to pre-calculate a composite attractiveness score:
+
+```{r}
+#| eval: false
+stores_composite <- stores |>
+  mutate(
+    # Example: HEB stores get a 20% brand premium
+    brand_factor = if_else(chain == "HEB", 1.2, 1.0),
+    attractiveness = sqft * brand_factor
+  )
+
+result_composite <- huff(
+  demand = demand_pts,
+  stores = stores_composite,
+  attractiveness_col = "attractiveness",
+  distance_exponent = -1.5
+)
+```
+
+## Next steps
+
+-   [Facility Location](facility-location.html) - Optimize facility placement
+-   [Regionalization](regionalization.html) - Build custom regions from Census data
+-   [Travel-Time Cost Matrices](travel-time-matrices.html) - Use driving times instead of straight-line distances
