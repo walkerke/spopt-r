@@ -2,17 +2,10 @@
 
 The **spopt** R package provides R-native implementations of spatial optimization algorithms for regionalization, facility location, and market analysis. Inspired by [Python's PySAL spopt](https://pysal.org/spopt/), the package brings these powerful algorithms to R users with an sf-first API and a Rust backend for performance.
 
-Install from r-universe (recommended):
+Install from r-universe:
 
 ```r
 install.packages("spopt", repos = "https://walkerke.r-universe.dev")
-```
-
-Or install the development version from GitHub:
-
-```r
-# install.packages("pak")
-pak::pak("walkerke/spopt-r")
 ```
 
 Read through these vignettes to learn how to use the package:
