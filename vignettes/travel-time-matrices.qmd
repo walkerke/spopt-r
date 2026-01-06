@@ -21,12 +21,13 @@ The difference can be substantial. In areas with limited river crossings, highwa
 
 ## Routing options in R
 
-Several R packages can generate travel-time matrices:
+Several R packages can generate travel-time matrices, including but not limited to:
 
 -   **r5r**: Fast routing using R5 engine; supports driving, walking, cycling, and public transit; handles large-scale analyses
 -   **dodgr**: Street network routing using OpenStreetMap data; good for walking and cycling
 -   **osrm**: Interface to OSRM routing engine; fast car routing with traffic-like weights
 -   **mapboxapi**: Interface to Mapbox's routing services; includes traffic-aware routing
+-   **googleway**: Interface to Google's Directions API
 
 In this vignette, we'll use r5r to generate a travel-time matrix, then demonstrate how to use it with spopt's facility location algorithms.
 
@@ -42,19 +43,20 @@ install.packages("rJavaEnv")
 rJavaEnv::java_quick_install(version = 21)
 
 # Set Java memory and load libraries
-options(java.parameters = "-Xmx8G")
+options(java.parameters = "-Xmx8G") # Allocating 8GB RAM
 library(r5r)
 library(sf)
 library(tidyverse)
 library(tidycensus)
 
 # Download and clip OSM data to study area
-# We used osmium to clip the US South extract to Tarrant County:
+# First, fetch OSM data from https://download.geofabrik.de/north-america/us-south-latest.osm.pbf (3.7GB)
+# Then, use osmium to clip the US South extract to Tarrant County:
 # osmium extract -b -97.55,32.55,-97.0,33.05 us-south.osm.pbf -o tarrant.osm.pbf
 
 # Build routing network
 data_path <- "path/to/osm/directory"
-r5r_core <- setup_r5(data_path = data_path)
+r5r_core <- build_network(data_path = data_path)
 
 # Get tract centroids as demand points
 tarrant_tracts <- get_acs(
@@ -284,7 +286,7 @@ maplibre(bounds = tracts) |>
  )
 ```
 
-Each demand point is colored by its assigned facility. Notice how the service areas follow the road network structure rather than forming simple circular regions.
+Each demand point is colored by its assigned facility. Notice how the service areas follow the road network structure rather than forming simple circular regions; look in particular along major highways.
 
 ## Best practices
 
@@ -294,9 +296,9 @@ When working with travel-time matrices:
 
 -   **Handle unreachable pairs**: Set unreachable origin-destination pairs to `Inf` rather than `NA`.
 
--   **Cache your matrices**: Travel-time computation is expensive. Save matrices with `saveRDS()` for reuse.
+-   **Cache your matrices**: Travel-time computation is expensive. Save matrices with `readr::write_rds()` for reuse.
 
--   **Consider asymmetry**: Driving times can differ by direction (one-way streets, turn restrictions). For most facility location problems, you may want to average both directions.
+-   **Optimize your source data**: To speed up your matrix calculations, clip your OSM source data as close as possible to your area of analysis with `osmium` before building your routing network. If using a third-party API, pay close attention to costs. For many-to-many matrices required for solving optimization problems, Google / Mapbox APIs can get expensive quickly.
 
 ## Next steps
 
