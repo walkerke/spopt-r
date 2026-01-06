@@ -18,3 +18,5 @@
 ^docs$
 ^pkgdown$
 ^vignettes/images$
+^rjavaenv$
+^data-raw$

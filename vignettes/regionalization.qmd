@@ -2,6 +2,7 @@
 title: "Regionalization with spopt"
 format: html
 editor: visual
+bibliography: references.bib
 ---
 
 ```{r setup, include = FALSE}
@@ -11,7 +12,7 @@ options(tigris_use_cache = TRUE)
 
 *Regionalization* refers to the process of grouping smaller geographic units into larger, spatially contiguous regions. Unlike standard clustering methods, regionalization algorithms enforce that resulting regions form connected geographic areas - you can't have a region with disconnected pieces scattered across the map.
 
-This vignette walks through spopt's regionalization algorithms using Census tract data from the Dallas-Fort Worth metropolitan area. We'll explore how to build regions that minimize internal heterogeneity while maintaining spatial contiguity and meeting population thresholds.
+This vignette walks through spopt's regionalization algorithms using Census tract data from Dallas, Texas. We'll explore how to build regions that minimize internal heterogeneity while maintaining spatial contiguity and meeting population thresholds.
 
 ## When would you use regionalization?
 
@@ -23,18 +24,16 @@ Regionalization solves problems across many fields:
 -   **Urban planning**: Delineating neighborhoods based on socioeconomic similarity
 -   **Census data analysis**: Addressing differential privacy concerns by aggregating blocks into larger areas
 
-The Census Bureau [recommends against using individual block-level data](https://www2.census.gov/library/publications/decennial/2020/census-briefs/c2020br-02.pdf) from the 2020 Census due to noise introduced by differential privacy. Regionalization offers a principled way to aggregate block data into more reliable custom geographies.
-
 ## Getting Census data
 
 Let's start by pulling some demographic data for Census tracts in Dallas County, Texas. We'll use the tidycensus package to get population, median household income, and percentage with a bachelor's degree - variables that might define meaningful neighborhood clusters.
 
 ```{r}
-#| eval: false
 library(spopt)
 library(tidycensus)
 library(tidyverse)
 library(sf)
+library(mapgl)
 
 dallas <- get_acs(
   geography = "tract",
@@ -46,57 +45,27 @@ dallas <- get_acs(
   state = "TX",
   county = "Dallas",
   geometry = TRUE,
-  year = 2022,
+  year = 2023,
   output = "wide"
 ) |>
-  filter(!is.na(incomeE), !is.na(bachelorsE), popE > 0)
-```
-
-```{r}
-#| echo: false
-#| eval: true
-library(spopt)
-library(tidycensus)
-library(tidyverse)
-library(sf)
-
-dallas <- get_acs(
-  geography = "tract",
-  variables = c(
-    pop = "B01003_001",
-    income = "B19013_001",
-    bachelors = "DP02_0068P"
-  ),
-  state = "TX",
-  county = "Dallas",
-  geometry = TRUE,
-  year = 2022,
-  output = "wide"
-) |>
-  filter(!is.na(incomeE), !is.na(bachelorsE), popE > 0)
+  filter(!is.na(incomeE), !is.na(bachelorsE))
 ```
 
 We now have `r nrow(dallas)` Census tracts with population, income, and education data. Let's take a quick look at the geographic distribution of median household income:
 
 ```{r}
-#| eval: false
-library(mapgl)
-
 maplibre_view(dallas, column = "incomeE")
 ```
 
-![*Screenshot: Dallas County Census tracts colored by median household income*](images/dallas-income.png)
-
-The map reveals the familiar spatial pattern of income inequality in Dallas - higher incomes concentrated in the northern suburbs, with lower incomes in the southern and central portions of the county.
+The map reveals the familiar spatial pattern of income inequality in Dallas - higher incomes concentrated in the Park Cities north of downtown, with lower incomes in the southern part of the county.
 
 ## Max-P regionalization
 
-The *Max-P* algorithm finds the maximum number of regions such that each region exceeds a specified population threshold while minimizing within-region heterogeneity. This is particularly useful when you need regions that meet minimum population requirements for statistical reliability.
+The *Max-P* algorithm [@duque2012] finds the maximum number of regions such that each region exceeds a specified threshold while minimizing within-region heterogeneity. This is particularly useful when you need regions that meet minimum population requirements for statistical reliability. Recent extensions support compactness constraints [@feng2022] and improved efficiency [@wei2021].
 
 Let's create regions where each must contain at least 50,000 people:
 
 ```{r}
-#| eval: false
 maxp_result <- max_p_regions(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -108,8 +77,6 @@ maxp_result <- max_p_regions(
 
 maplibre_view(maxp_result, column = ".region", legend = FALSE)
 ```
-
-![*Screenshot: Max-P regionalization results showing custom regions*](images/maxp-result.png)
 
 Let's step through the key parameters:
 
@@ -124,62 +91,101 @@ The result is an sf object with a new `.region` column indicating each tract's a
 You can access metadata about the solution through the `spopt` attribute:
 
 ```{r}
-#| eval: false
 attr(maxp_result, "spopt")
 ```
 
-## SKATER algorithm
+### Spatial weights
 
-*SKATER* (Spatial K'luster Analysis by Tree Edge Removal) takes a different approach. It first builds a minimum spanning tree connecting all tracts based on their attribute similarity, then iteratively removes edges to create clusters. The algorithm is fast and produces spatially coherent regions.
+By default, all regionalization functions use **queen contiguity** - two tracts are neighbors if they share any boundary point (including corners). You can also use **rook contiguity**, where tracts must share an edge to be neighbors:
 
 ```{r}
 #| eval: false
+maxp_rook <- max_p_regions(
+  dallas,
+  attrs = c("incomeE", "bachelorsE"),
+  threshold_var = "popE",
+  threshold = 50000,
+  weights = "rook",
+  n_iterations = 100,
+  seed = 1983
+)
+```
+
+For more control, you can specify weights as a list:
+
+-   `list(type = "knn", k = 6)`: K-nearest neighbors (useful for point data or ensuring connectivity)
+-   `list(type = "distance", d = 5000)`: Distance-based weights (units match your CRS)
+
+You can also pass an `nb` object created with spdep or spopt's `sp_weights()` function.
+
+### Compact regions
+
+For applications like sales territories or electoral districts, you may want regions with compact, regular shapes. The `compact` parameter optimizes for compactness in addition to attribute homogeneity:
+
+```{r}
+maxp_compact <- max_p_regions(
+  dallas,
+  attrs = c("incomeE", "bachelorsE"),
+  threshold_var = "popE",
+  threshold = 50000,
+  weights = "rook",
+  compact = TRUE,
+  compact_weight = 0.5,
+  n_iterations = 100,
+  seed = 1983
+)
+
+maplibre_view(maxp_compact, column = ".region", legend = FALSE)
+```
+
+The `compact_weight` parameter (0 to 1) controls the trade-off between attribute homogeneity and geometric compactness. Higher values prioritize compact shapes.
+
+## SKATER algorithm
+
+*SKATER* (Spatial K'luster Analysis by Tree Edge Removal) [@assuncao2006] takes a different approach. It first builds a minimum spanning tree connecting all tracts based on their attribute similarity, then iteratively removes edges to create clusters. The algorithm is fast and produces spatially coherent regions.
+
+```{r}
 skater_result <- skater(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
-  n_regions = 15,
+  n_regions = 6,
   seed = 1983
 )
 
 maplibre_view(skater_result, column = ".region", legend = FALSE)
 ```
 
-![*Screenshot: SKATER clustering results with 15 regions*](images/skater-result.png)
-
-SKATER supports a `floor_var` and `floor` parameter if you need minimum population constraints:
+SKATER supports a `floor` and `floor_value` parameter if you need minimum population constraints:
 
 ```{r}
 #| eval: false
 skater_constrained <- skater(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
-  n_regions = 15,
-  floor_var = "popE",
-  floor = 30000,
+  n_regions = 6,
+  floor = "popE",
+  floor_value = 150000,
   seed = 1983
 )
 ```
 
 ## AZP: Automatic Zoning Procedure
 
-The *Automatic Zoning Procedure* (AZP) uses local search optimization with three algorithm variants: basic (greedy), tabu search, and simulated annealing. The tabu search variant often produces the best results for moderately-sized problems.
+The *Automatic Zoning Procedure* (AZP) [@openshaw1977; @openshaw1995] uses local search optimization with three algorithm variants: basic (greedy), tabu search, and simulated annealing.
 
 ```{r}
-#| eval: false
 azp_result <- azp(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
   n_regions = 20,
   method = "tabu",
   tabu_length = 10,
-  n_iterations = 100,
+  max_iterations = 100,
   seed = 1983
 )
 
 maplibre_view(azp_result, column = ".region", legend = FALSE)
 ```
-
-![*Screenshot: AZP results with 20 regions using tabu search*](images/azp-result.png)
 
 The `method` parameter controls which algorithm variant to use:
 
@@ -197,17 +203,16 @@ azp_sa <- azp(
   n_regions = 20,
   method = "sa",
   cooling_rate = 0.85,
-  n_iterations = 100,
+  max_iterations = 100,
   seed = 1983
 )
 ```
 
 ## SPENC: Spatially-Encouraged Spectral Clustering
 
-*SPENC* combines spectral clustering with spatial constraints. It uses a radial basis function (RBF) kernel to measure attribute similarity and incorporates spatial connectivity into the spectral embedding. This approach can find clusters with complex, non-convex shapes that other methods might miss.
+*SPENC* [@wolf2021] combines spectral clustering with spatial constraints. It uses a radial basis function (RBF) kernel to measure attribute similarity and incorporates spatial connectivity into the spectral embedding. This approach can find clusters with complex, non-convex shapes that other methods might miss.
 
 ```{r}
-#| eval: false
 spenc_result <- spenc(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -219,8 +224,6 @@ spenc_result <- spenc(
 maplibre_view(spenc_result, column = ".region", legend = FALSE)
 ```
 
-![*Screenshot: SPENC spectral clustering results*](images/spenc-result.png)
-
 The `gamma` parameter controls the RBF kernel bandwidth - higher values create "tighter" clusters in attribute space.
 
 ## Ward spatial clustering
@@ -228,7 +231,6 @@ The `gamma` parameter controls the RBF kernel bandwidth - higher values create "
 Spatially-constrained *Ward* clustering is a hierarchical method that only allows merging adjacent clusters. At each step, it merges the pair of adjacent clusters that minimizes the increase in total within-cluster variance.
 
 ```{r}
-#| eval: false
 ward_result <- ward_spatial(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -238,44 +240,26 @@ ward_result <- ward_spatial(
 maplibre_view(ward_result, column = ".region", legend = FALSE)
 ```
 
-![*Screenshot: Ward spatial clustering results*](images/ward-result.png)
-
 Ward clustering is deterministic (no random seed needed) and tends to produce compact, roughly equal-sized regions.
-
-## Handling islands and disconnected geometries
-
-Real-world geographic data often contains "islands" - tracts that don't share boundaries with any other tracts due to water features, highways, or data artifacts. By default, spopt functions will warn you about disconnected components.
-
-The `bridge_islands` parameter provides an automatic fix by connecting isolated tracts to their nearest neighbors:
-
-```{r}
-#| eval: false
-result <- max_p_regions(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  threshold_var = "popE",
-  threshold = 50000,
-  bridge_islands = TRUE,
-  seed = 1983
-)
-```
 
 ## Choosing an algorithm
 
 Each regionalization algorithm has strengths for different scenarios:
 
 | Algorithm | Best for | Key features |
-|-----------|----------|--------------|
+|----|----|----|
 | **Max-P** | Population thresholds | Maximizes number of regions meeting constraints |
 | **SKATER** | Fast, interpretable results | Tree-based, good for large datasets |
 | **AZP** | High-quality solutions | Multiple optimization variants |
 | **SPENC** | Complex cluster shapes | Spectral embedding with spatial constraints |
 | **Ward** | Deterministic, balanced regions | Hierarchical, no tuning required |
 
-For most applications, I'd recommend starting with **Max-P** if you have population constraints, or **SKATER** for a quick first pass. If solution quality is critical and you have time for parameter tuning, **AZP** with tabu search often produces the best results.
+For most applications, I'd recommend starting with **Max-P** if you have population constraints, or **SKATER** for a quick first pass. If you want to explore the solution space more thoroughly, try **AZP** with tabu search or simulated annealing.
 
 ## Next steps
 
 -   [Facility Location](facility-location.html) - Solve location-allocation problems
 -   [Huff Model](huff-model.html) - Model market share and retail competition
 -   [Travel-Time Cost Matrices](travel-time-matrices.html) - Use real-world travel times
+
+## References

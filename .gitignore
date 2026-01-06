@@ -33,3 +33,6 @@ target
 rust/vendor
 Makevars
 Makevars.win
+
+# rJavaEnv
+rjavaenv/

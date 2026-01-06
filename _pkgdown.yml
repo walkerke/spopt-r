@@ -1,13 +1,21 @@
 url: https://walker-data.com/spopt/
 template:
   bootstrap: 5
-  bootswatch: flatly
+  bslib:
+    bg: "#ffffff"
+    fg: "#1e3a5f"
+    primary: "#4abe4f"
+    secondary: "#3b9ecf"
+    link-color: "#3b9ecf"
+    code-color: "#4abe4f"
 
 home:
   title: spopt
   description: Spatial optimization for regionalization, facility location, and market analysis in R
 
 navbar:
+  bg: "#1e3a5f"
+  type: dark
   structure:
     left:  [intro, reference, articles]
     right: [search, github]
@@ -60,6 +68,15 @@ reference:
   contents:
   - sp_weights
   - distance_matrix
+
+- title: Data
+  desc: Example datasets
+  contents:
+  - tarrant_travel_times
+
+- title: internal
+  contents:
+  - starts_with("rust_")
 
 articles:
 - title: Getting Started

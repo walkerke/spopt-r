@@ -127,7 +127,7 @@ end_time <- Sys.time()
 
   # Attach results to sf object
   result <- data
-  result$.region <- as.integer(labels)
+  result$.region <- as.character(labels)
 
   # Compute objective (total within-cluster SSD)
   objective <- compute_ssd(attr_matrix, labels)

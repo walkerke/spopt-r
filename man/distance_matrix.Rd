@@ -16,17 +16,21 @@ distance_matrix(
 
 \item{y}{An sf object (facility locations). If NULL, computes distances within x.}
 
-\item{type}{Distance type: "euclidean" (default) or "manhattan".}
+\item{type}{Distance type: "euclidean" (default) or "manhattan". Note that for
+geographic CRS, only "euclidean" (great circle) distance is available.}
 
 \item{use_centroids}{Logical. If TRUE (default for polygons), use polygon centroids.}
 }
 \value{
 A numeric matrix of distances. Rows correspond to x, columns to y.
+For geographic CRS, distances are in meters. For projected CRS, distances
+are in the CRS units (usually meters).
 }
 \description{
-Computes pairwise distances between geometries. For points, uses
-Euclidean distance. For polygons, uses centroid-to-centroid distance
-by default.
+Computes pairwise distances between geometries. For geographic (longlat)
+coordinate systems, uses great circle distances in meters via \code{\link[sf:geos_measures]{sf::st_distance()}}.
+For projected coordinate systems, uses fast Euclidean distance in the CRS units
+(typically meters).
 }
 \examples{
 \dontrun{

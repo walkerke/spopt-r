@@ -40,3 +40,4 @@ URL: https://github.com/kylewalker/spopt-r
 BugReports: https://github.com/kylewalker/spopt-r/issues
 Depends: 
     R (>= 4.2)
+LazyData: true

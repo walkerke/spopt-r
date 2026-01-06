@@ -9,7 +9,7 @@ knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 options(tigris_use_cache = TRUE)
 ```
 
-spopt provides R-native implementations of spatial optimization algorithms for regionalization, facility location, and market analysis. The package is designed as an alternative to Python's PySAL spopt library, bringing these powerful algorithms to R users with an sf-first API and a Rust backend for performance.
+spopt provides R-native implementations of spatial optimization algorithms for regionalization, facility location, and market analysis. The package is inspired by Python's PySAL spopt library, my all-time favorite Python package. Its aim is to bring spopt's powerful algorithms to R users with an sf-first API and a Rust backend for performance.
 
 ### Installation
 
@@ -23,7 +23,6 @@ install.packages("spopt", repos = "https://walkerke.r-universe.dev")
 Once installed, load the package along with sf for spatial data handling and tidyverse for data manipulation:
 
 ```{r}
-#| eval: false
 library(spopt)
 library(sf)
 library(tidyverse)
@@ -44,8 +43,6 @@ spopt includes three families of spatial optimization algorithms:
 Let's run a quick facility location analysis to see spopt in action. We'll find optimal locations for 5 facilities to serve Census tracts in Tarrant County, Texas (home of Fort Worth).
 
 ```{r}
-#| eval: false
-library(spopt)
 library(tidycensus)
 
 # Get population data for Tarrant County tracts
