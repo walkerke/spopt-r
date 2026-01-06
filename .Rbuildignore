@@ -17,6 +17,6 @@
 ^_pkgdown\.yml$
 ^docs$
 ^pkgdown$
-^vignettes/images$
+^vignettes$
 ^rjavaenv$
 ^data-raw$
