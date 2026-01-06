@@ -8,6 +8,8 @@ Install from r-universe:
 install.packages("spopt", repos = "https://walkerke.r-universe.dev")
 ```
 
+For developers who need to build from source (requires Rust), see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 Read through these vignettes to learn how to use the package:
 
 - [Getting started with __spopt__](https://walker-data.com/spopt/articles/getting-started.html)
