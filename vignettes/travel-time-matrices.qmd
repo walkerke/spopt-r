@@ -1,0 +1,305 @@
+---
+title: "Travel-time cost matrices"
+format: html
+editor: visual
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+options(tigris_use_cache = TRUE)
+```
+
+By default, spopt's facility location functions calculate Euclidean (straight-line) distances between points. While this is fast and often sufficient for initial analysis, real-world accessibility depends on road networks, traffic patterns, and travel mode. A location that's "close" as the crow flies might be far away by car if separated by a river, highway, or geographic barrier.
+
+This vignette demonstrates how to generate travel-time matrices using external routing engines and integrate them with spopt for more realistic facility location analysis.
+
+## Why travel times matter
+
+Consider placing emergency medical services in a metropolitan area. Straight-line distance might suggest one configuration, but accounting for actual drive times - influenced by road networks, speed limits, and traffic - could yield very different optimal locations.
+
+The difference can be substantial. In areas with limited river crossings, highway barriers, or mountainous terrain, Euclidean distance can significantly underestimate actual travel costs. For high-stakes decisions like emergency service placement or critical infrastructure siting, using real travel times is essential.
+
+## Routing options in R
+
+Several R packages can generate travel-time matrices:
+
+-   **r5r**: Fast routing using R5 engine; supports driving, walking, cycling, and public transit; handles large-scale analyses
+-   **dodgr**: Street network routing using OpenStreetMap data; good for walking and cycling
+-   **osrm**: Interface to OSRM routing engine; fast car routing with traffic-like weights
+-   **mapboxapi**: Interface to Mapbox's routing services; includes traffic-aware routing
+
+In this vignette, we'll use r5r to generate a travel-time matrix, then demonstrate how to use it with spopt's facility location algorithms.
+
+## Generating a travel-time matrix with r5r
+
+r5r requires Java 21 and OpenStreetMap data. Here's the workflow used to generate a travel-time matrix for Tarrant County, Texas:
+
+```{r}
+#| eval: false
+# Install r5r and set up Java
+install.packages("r5r")
+install.packages("rJavaEnv")
+rJavaEnv::java_quick_install(version = 21)
+
+# Set Java memory and load libraries
+options(java.parameters = "-Xmx8G")
+library(r5r)
+library(sf)
+library(tidyverse)
+library(tidycensus)
+
+# Download and clip OSM data to study area
+# We used osmium to clip the US South extract to Tarrant County:
+# osmium extract -b -97.55,32.55,-97.0,33.05 us-south.osm.pbf -o tarrant.osm.pbf
+
+# Build routing network
+data_path <- "path/to/osm/directory"
+r5r_core <- setup_r5(data_path = data_path)
+
+# Get tract centroids as demand points
+tarrant_tracts <- get_acs(
+ geography = "tract",
+ variables = "B01003_001",
+ state = "TX",
+ county = "Tarrant",
+ geometry = TRUE,
+ year = 2023
+) |>
+ filter(estimate > 0) |>
+ rename(population = estimate)
+
+demand_pts <- tarrant_tracts |>
+ st_centroid() |>
+ st_transform(4326) |>
+ mutate(id = row_number())
+
+# Sample 30 candidate facility locations
+set.seed(1983)
+candidate_pts <- st_sample(st_union(tarrant_tracts), 30) |>
+ st_as_sf() |>
+ st_transform(4326) |>
+ mutate(id = row_number())
+
+# Prepare points for r5r (requires id, lon, lat columns)
+demand_r5r <- demand_pts |>
+ st_coordinates() |>
+ as_tibble() |>
+ rename(lon = X, lat = Y) |>
+ mutate(id = as.character(demand_pts$id))
+
+candidates_r5r <- candidate_pts |>
+ st_coordinates() |>
+ as_tibble() |>
+ rename(lon = X, lat = Y) |>
+ mutate(id = as.character(candidate_pts$id))
+
+# Calculate travel-time matrix
+ttm <- travel_time_matrix(
+ r5r_core,
+ origins = demand_r5r,
+ destinations = candidates_r5r,
+ mode = "CAR",
+ departure_datetime = as.POSIXct("2025-03-15 08:00:00"),
+ max_trip_duration = 120,
+ progress = TRUE
+)
+
+# Reshape to matrix format
+ttm_matrix <- ttm |>
+ select(from_id, to_id, travel_time_p50) |>
+ pivot_wider(names_from = to_id, values_from = travel_time_p50) |>
+ arrange(as.numeric(from_id)) |>
+ select(-from_id) |>
+ as.matrix()
+
+ttm_matrix[is.na(ttm_matrix)] <- Inf
+
+stop_r5(r5r_core)
+```
+
+## Using the bundled travel-time data
+
+spopt includes a pre-computed travel-time matrix for Tarrant County that we'll use for the examples below. This data was generated using the workflow above.
+
+```{r}
+library(spopt)
+library(sf)
+library(tidyverse)
+library(mapgl)
+
+# Load the bundled data
+data(tarrant_travel_times)
+
+# Extract components
+tracts <- tarrant_travel_times$tracts
+demand <- tarrant_travel_times$demand
+candidates <- tarrant_travel_times$candidates
+ttm <- tarrant_travel_times$matrix
+
+# Check dimensions
+dim(ttm)
+```
+
+The matrix has `r nrow(ttm)` rows (demand points) and `r ncol(ttm)` columns (candidate facilities), with travel times in minutes.
+
+## P-Median: Euclidean vs travel time
+
+Let's compare P-Median solutions using Euclidean distance versus actual travel times:
+
+```{r}
+# Solution using travel-time matrix
+result_tt <- p_median(
+ demand = demand,
+ facilities = candidates,
+ n_facilities = 5,
+ weight_col = "population",
+ cost_matrix = ttm
+)
+
+# Solution using Euclidean distance
+result_euc <- p_median(
+ demand = demand,
+ facilities = candidates,
+ n_facilities = 5,
+ weight_col = "population"
+)
+
+# Get selected facility IDs from each solution
+selected_tt_ids <- result_tt$facilities |>
+ filter(.selected) |>
+ pull(id)
+
+selected_euc_ids <- result_euc$facilities |>
+ filter(.selected) |>
+ pull(id)
+
+# Categorize facilities
+candidates_compared <- candidates |>
+ mutate(
+   selected_tt = id %in% selected_tt_ids,
+   selected_euc = id %in% selected_euc_ids,
+   category = case_when(
+     selected_tt & selected_euc ~ "Both methods",
+     selected_tt ~ "Travel time only",
+     selected_euc ~ "Euclidean only",
+     TRUE ~ "Not selected"
+   )
+ )
+
+# Count by category
+candidates_compared |>
+ st_drop_geometry() |>
+ filter(category != "Not selected") |>
+ count(category)
+```
+
+The two methods select quite different facility locations. Let's visualize the comparison:
+
+```{r}
+# Filter to only selected facilities
+selected_facilities <- candidates_compared |>
+ filter(category != "Not selected")
+
+maplibre(bounds = tracts) |>
+ add_fill_layer(
+   id = "tracts",
+   source = tracts,
+   fill_color = "lightgray",
+   fill_opacity = 0.3
+ ) |>
+ add_circle_layer(
+   id = "facilities",
+   source = selected_facilities,
+   circle_radius = 10,
+   circle_color = match_expr(
+     column = "category",
+     values = c("Both methods", "Travel time only", "Euclidean only"),
+     stops = c("#9b59b6", "#e74c3c", "#3498db")
+   ),
+   circle_stroke_color = "white",
+   circle_stroke_width = 2
+ )
+```
+
+Purple markers indicate facilities selected by both methods, red markers are selected only when using travel times, and blue markers are selected only with Euclidean distance.
+
+## Why the solutions differ
+
+The travel-time solution accounts for the actual road network. Facilities shift toward locations with better highway access, even if they're farther in straight-line distance. Let's examine the objective values:
+
+```{r}
+# Compare objective values
+tt_obj <- attr(result_tt, "spopt")$objective
+euc_obj <- attr(result_euc, "spopt")$objective
+
+cat("Travel-time solution objective:", round(tt_obj, 0), "person-minutes\n")
+cat("Euclidean solution objective:", round(euc_obj, 0), "person-meters\n")
+```
+
+Note that the objectives use different units (minutes vs meters), so they're not directly comparable. What matters is that each solution is optimal for its respective cost measure.
+
+## Visualizing service areas
+
+We can also visualize how demand points are assigned to facilities under each solution:
+
+```{r}
+# Get demand assignments from travel-time solution
+demand_tt <- result_tt$demand |>
+ mutate(facility_id = as.character(.facility))
+
+# Get the selected facilities
+facilities_tt <- result_tt$facilities |>
+ filter(.selected) |>
+ mutate(facility_id = as.character(id))
+
+maplibre(bounds = tracts) |>
+ add_fill_layer(
+   id = "tracts",
+   source = tracts,
+   fill_color = "lightgray",
+   fill_opacity = 0.2
+ ) |>
+ add_circle_layer(
+   id = "demand",
+   source = demand_tt,
+   circle_radius = 4,
+   circle_opacity = 0.7,
+   circle_color = match_expr(
+     column = "facility_id",
+     values = facilities_tt$facility_id,
+     stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
+   )
+ ) |>
+ add_circle_layer(
+   id = "facilities",
+   source = facilities_tt,
+   circle_radius = 12,
+   circle_color = match_expr(
+     column = "facility_id",
+     values = facilities_tt$facility_id,
+     stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
+   ),
+   circle_stroke_color = "white",
+   circle_stroke_width = 3
+ )
+```
+
+Each demand point is colored by its assigned facility. Notice how the service areas follow the road network structure rather than forming simple circular regions.
+
+## Best practices
+
+When working with travel-time matrices:
+
+-   **Match row/column order**: Ensure your cost matrix rows correspond to demand points and columns to facilities in the same order as your sf objects.
+
+-   **Handle unreachable pairs**: Set unreachable origin-destination pairs to `Inf` rather than `NA`.
+
+-   **Cache your matrices**: Travel-time computation is expensive. Save matrices with `saveRDS()` for reuse.
+
+-   **Consider asymmetry**: Driving times can differ by direction (one-way streets, turn restrictions). For most facility location problems, you may want to average both directions.
+
+## Next steps
+
+-   [Facility Location](facility-location.html) - Overview of all location algorithms
+-   [Huff Model](huff-model.html) - Travel times also work with the Huff model
+-   [Regionalization](regionalization.html) - Build custom regions

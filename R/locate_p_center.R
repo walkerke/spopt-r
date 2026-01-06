@@ -10,6 +10,8 @@
 #' @param n_facilities Integer. Number of facilities to locate (p).
 #' @param cost_matrix Optional. Pre-computed distance matrix.
 #' @param distance_metric Distance metric: "euclidean" (default) or "manhattan".
+#' @param method Algorithm to use: "binary_search" (default, faster) or "mip"
+#'   (direct mixed-integer programming formulation).
 #' @param verbose Logical. Print solver progress.
 #'
 #' @return A list with two sf objects:
@@ -24,7 +26,17 @@
 #' and its assigned facility. This "minimax" objective ensures equitable access
 #' by focusing on the worst-served location rather than average performance.
 #'
-#' The integer programming formulation is:
+#' Two algorithms are available:
+#' \itemize{
+#'   \item `"binary_search"` (default): Binary search over distances with set
+#'     covering subproblems. This converts the difficult minimax objective into
+#'     simpler feasibility problems and is typically much faster.
+#'   \item `"mip"`: Direct mixed-integer programming formulation with the
+#'     minimax objective. Can be slower but may be preferred for small problems
+#'     or when exact optimality certificates are needed.
+#' }
+#'
+#' The direct MIP formulation is:
 #' \deqn{\min W}
 #' Subject to:
 #' \deqn{\sum_j y_j = p}
@@ -80,7 +92,9 @@ p_center <- function(demand,
                      n_facilities,
                      cost_matrix = NULL,
                      distance_metric = "euclidean",
+                     method = c("binary_search", "mip"),
                      verbose = FALSE) {
+  method <- match.arg(method)
   if (!inherits(demand, "sf")) {
     stop("`demand` must be an sf object", call. = FALSE)
   }
@@ -117,8 +131,8 @@ p_center <- function(demand,
 
   start_time <- Sys.time()
 
-  # Call Rust MIP solver
-  result <- rust_p_center(cost_matrix, as.integer(n_facilities))
+  # Call Rust solver with specified method
+  result <- rust_p_center(cost_matrix, as.integer(n_facilities), method)
 
   end_time <- Sys.time()
 
@@ -141,6 +155,7 @@ p_center <- function(demand,
 
   metadata <- list(
     algorithm = "p_center",
+    method = method,
     n_selected = length(result$selected),
     n_facilities = n_facilities,
     objective = result$max_distance,

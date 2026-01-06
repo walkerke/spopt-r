@@ -4,12 +4,14 @@
 \alias{rust_p_center}
 \title{Solve P-Center facility location problem}
 \usage{
-rust_p_center(cost_matrix, n_facilities)
+rust_p_center(cost_matrix, n_facilities, method)
 }
 \arguments{
 \item{cost_matrix}{Cost/distance matrix (demand x facilities)}
 
 \item{n_facilities}{Number of facilities to locate}
+
+\item{method}{Algorithm method: "binary_search" (default) or "mip"}
 }
 \value{
 List with selected facilities, assignments, and max distance

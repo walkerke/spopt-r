@@ -182,7 +182,7 @@ azp <- function(data,
 
   # Attach results to sf object
   result <- data
-  result$.region <- as.integer(labels)
+  result$.region <- as.character(labels)
 
   if (verbose) {
     message(sprintf(

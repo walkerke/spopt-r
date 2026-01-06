@@ -167,9 +167,10 @@ rust_mclp <- function(cost_matrix, weights, service_radius, n_facilities) .Call(
 #'
 #' @param cost_matrix Cost/distance matrix (demand x facilities)
 #' @param n_facilities Number of facilities to locate
+#' @param method Algorithm method: "binary_search" (default) or "mip"
 #' @return List with selected facilities, assignments, and max distance
 #' @export
-rust_p_center <- function(cost_matrix, n_facilities) .Call(wrap__rust_p_center, cost_matrix, n_facilities)
+rust_p_center <- function(cost_matrix, n_facilities, method) .Call(wrap__rust_p_center, cost_matrix, n_facilities, method)
 
 #' Solve P-Dispersion facility location problem
 #'

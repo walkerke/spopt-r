@@ -1,0 +1,97 @@
+url: https://walker-data.com/spopt/
+template:
+  bootstrap: 5
+  bslib:
+    bg: "#ffffff"
+    fg: "#1e3a5f"
+    primary: "#4abe4f"
+    secondary: "#3b9ecf"
+    link-color: "#3b9ecf"
+    code-color: "#4abe4f"
+
+home:
+  title: spopt
+  description: Spatial optimization for regionalization, facility location, and market analysis in R
+
+navbar:
+  bg: "#1e3a5f"
+  type: dark
+  structure:
+    left:  [intro, reference, articles]
+    right: [search, github]
+  components:
+    articles:
+      text: Articles
+      menu:
+      - text: Getting Started
+        href: articles/getting-started.html
+      - text: "---"
+      - text: Regionalization
+        href: articles/regionalization.html
+      - text: Facility Location
+        href: articles/facility-location.html
+      - text: Huff Model
+        href: articles/huff-model.html
+      - text: "---"
+      - text: Travel-Time Cost Matrices
+        href: articles/travel-time-matrices.html
+
+reference:
+- title: Regionalization
+
+  desc: Algorithms for spatially-constrained clustering
+  contents:
+  - skater
+  - azp
+  - max_p_regions
+  - spenc
+  - ward_spatial
+
+- title: Facility Location
+  desc: Optimal facility siting algorithms
+  contents:
+  - p_median
+  - p_center
+  - p_dispersion
+  - lscp
+  - mclp
+  - cflp
+  - frlm
+
+- title: Market Analysis
+  desc: Market share and competition modeling
+  contents:
+  - huff
+
+- title: Utilities
+  desc: Helper functions for spatial optimization
+  contents:
+  - sp_weights
+  - distance_matrix
+
+- title: Data
+  desc: Example datasets
+  contents:
+  - tarrant_travel_times
+
+- title: internal
+  contents:
+  - starts_with("rust_")
+
+articles:
+- title: Getting Started
+  navbar: ~
+  contents:
+  - getting-started
+
+- title: Core Algorithms
+  navbar: ~
+  contents:
+  - regionalization
+  - facility-location
+  - huff-model
+
+- title: Advanced Topics
+  navbar: ~
+  contents:
+  - travel-time-matrices

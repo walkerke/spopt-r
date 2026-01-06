@@ -25,7 +25,14 @@ Imports:
 Suggests:
     testthat (>= 3.0.0),
     dodgr,
-    r5r
+    r5r,
+    knitr,
+    rmarkdown,
+    quarto,
+    tidycensus,
+    tidyverse,
+    mapgl
+VignetteBuilder: quarto
 Config/testthat/edition: 3
 Config/rextendr/version: 0.4.2.9000
 SystemRequirements: Cargo (Rust's package manager), rustc >= 1.70, cmake, libclang-dev
@@ -33,3 +40,4 @@ URL: https://github.com/kylewalker/spopt-r
 BugReports: https://github.com/kylewalker/spopt-r/issues
 Depends: 
     R (>= 4.2)
+LazyData: true

@@ -159,14 +159,16 @@ fn rust_mclp(
 ///
 /// @param cost_matrix Cost/distance matrix (demand x facilities)
 /// @param n_facilities Number of facilities to locate
+/// @param method Algorithm method: "binary_search" (default) or "mip"
 /// @return List with selected facilities, assignments, and max distance
 /// @export
 #[extendr]
 fn rust_p_center(
     cost_matrix: RMatrix<f64>,
     n_facilities: i32,
+    method: &str,
 ) -> List {
-    locate::p_center::solve(cost_matrix, n_facilities as usize)
+    locate::p_center::solve(cost_matrix, n_facilities as usize, method)
 }
 
 /// Solve P-Dispersion facility location problem

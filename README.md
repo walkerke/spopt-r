@@ -1,149 +1,38 @@
-# spopt
-<!-- badges: start -->
-<!-- badges: end -->
-Spatial Optimization for R. An R-native implementation of spatial optimization algorithms, inspired by [Python spopt](https://pysal.org/spopt/).
+# spopt <a href="https://walker-data.com/spopt/"><img src="man/figures/logo.png" align="right" height="120" alt="spopt website" /></a>
 
-## Features
+The **spopt** R package provides R-native implementations of spatial optimization algorithms for regionalization, facility location, and market analysis. Inspired by [Python's PySAL spopt](https://pysal.org/spopt/), the package brings these powerful algorithms to R users with an sf-first API and a Rust backend for performance.
 
-### Regionalization (Spatial Clustering)
-- `skater()` - Spatial K'luster Analysis by Tree Edge Removal
-- `ward_spatial()` - Spatially constrained Ward hierarchical clustering
-- `max_p_regions()` - Maximize number of regions with threshold constraint
-- `azp()` - Automatic Zoning Procedure (basic, tabu, simulated annealing)
-- `spenc()` - Spatially-encouraged spectral clustering
-
-### Facility Location
-- `lscp()` - Location Set Covering Problem
-- `mclp()` - Maximum Coverage Location Problem
-- `p_median()` - P-Median (minimize total weighted distance)
-- `p_center()` - P-Center (minimize maximum distance)
-- `p_dispersion()` - P-Dispersion (maximize minimum inter-facility distance)
-- `cflp()` - Capacitated Facility Location (facilities with capacity limits)
-- `frlm()` - Flow Refueling Location Model
-
-### Market Analysis
-- `huff()` - Huff Model for market share and trade area analysis
-
-### Utilities
-- `sp_weights()` - Compute spatial contiguity weights (queen/rook)
-- `distance_matrix()` - Compute distance matrices between sf objects
-
-## Installation
-
-### From r-universe (recommended)
-
-Pre-built binaries are available for all platforms - no Rust toolchain required:
+Install from r-universe (recommended):
 
 ```r
 install.packages("spopt", repos = "https://walkerke.r-universe.dev")
 ```
 
-### From source
-
-Building from source requires:
-- **Rust** (>= 1.70) with cargo
-- **CMake**
-- **libclang** (for bindgen)
-  - macOS: Included with Xcode Command Line Tools
-  - Linux: `sudo apt install libclang-dev`
-  - Windows: `winget install LLVM.LLVM` and set `LIBCLANG_PATH=C:\Program Files\LLVM\bin`
+Or install the development version from GitHub:
 
 ```r
 # install.packages("pak")
 pak::pak("walkerke/spopt-r")
 ```
 
-## Usage
+Read through these vignettes to learn how to use the package:
 
-### Regionalization
+- [Getting started with __spopt__](https://walker-data.com/spopt/articles/getting-started.html)
 
-```r
-library(spopt)
-library(sf)
+- [Regionalization](https://walker-data.com/spopt/articles/regionalization.html)
 
-# Load example data
-nc <- st_read(system.file("shape/nc.shp", package = "sf"))
+- [Facility location](https://walker-data.com/spopt/articles/facility-location.html)
 
-# Cluster into 8 regions based on SIDS rates
-result <- skater(nc, attrs = c("SID74", "SID79"), n_regions = 8)
+- [Huff model](https://walker-data.com/spopt/articles/huff-model.html)
 
-# Result is sf with .region column
-plot(result[".region"])
+- [Travel-time cost matrices](https://walker-data.com/spopt/articles/travel-time-matrices.html)
 
-# Max-P: maximize regions where each has >= 100,000 births
-result <- max_p_regions(
- nc,
- attrs = c("SID74", "SID79"),
- threshold_var = "BIR74",
- threshold = 100000
-)
-attr(result, "spopt")$n_regions
-```
+## Support and how to learn more
 
-### Facility Location
+If you find this project useful in your work and would like to ensure continued development of the package, you can provide support in the following ways:
 
-```r
-library(spopt)
-library(sf)
+* [Chip in some funds to support package development via PayPal](https://www.paypal.com/paypalme/walkerdata/);
+* Set up a consulting engagement or workshop through Walker Data to help you implement __spopt__ in your project. Send a note to <kyle@walker-data.com> if you are interested;
+* File an issue - or even better, a pull request - at https://github.com/walkerke/spopt-r/issues.
 
-# Create demand and facility points
-set.seed(42)
-demand <- st_as_sf(
-  data.frame(x = runif(100), y = runif(100), population = rpois(100, 500)),
-  coords = c("x", "y")
-)
-facilities <- st_as_sf(
-  data.frame(x = runif(20), y = runif(20)),
-  coords = c("x", "y")
-)
-
-# P-Median: minimize total weighted distance with 5 facilities
-result <- p_median(demand, facilities, n_facilities = 5, weight_col = "population")
-
-# MCLP: maximize population covered within 0.3 units with 3 facilities
-result <- mclp(demand, facilities, service_radius = 0.3,
-               n_facilities = 3, weight_col = "population")
-attr(result, "spopt")$coverage_pct
-
-# View selected facilities
-result$facilities[result$facilities$.selected, ]
-```
-
-### Network Distances
-
-All facility location functions accept a custom `cost_matrix` for network-based analysis:
-
-```r
-library(dodgr)  # for road network distances
-
-# Get street network and compute travel times
-net <- dodgr_streetnet_sc(pts = st_coordinates(demand))
-graph <- weight_streetnet(net, wt_profile = "motorcar")
-
-# Compute travel time matrix (minutes)
-cost_matrix <- dodgr_times(graph,
-                           from = st_coordinates(demand),
-                           to = st_coordinates(facilities)) / 60
-
-# Use network times instead of Euclidean distance
-result <- p_median(demand, facilities, n_facilities = 5,
-                   weight_col = "population", cost_matrix = cost_matrix)
-```
-
-## Design Principles
-
-- **sf first**: All functions accept sf objects and return sf objects
-- **Snake case API**: `max_p_regions()`, `p_median()`, `sp_weights()`
-- **R-native**: No Python/reticulate dependency
-- **Fast**: Rust backend via extendr for performance-critical algorithms
-- **HiGHS solver**: Open-source MIP solver for facility location problems
-
-## License
-
-MIT
-
-## Acknowledgements
-
-- [PySAL spopt](https://pysal.org/spopt/) for algorithm implementations and inspiration
-- [extendr](https://extendr.github.io/) for R/Rust bindings
-- [HiGHS](https://highs.dev/) for the optimization solver
+To stay on top of package updates / new features and to get information about trainings, [be sure to sign up for the Walker Data mailing list here](https://walker-data.us15.list-manage.com/subscribe?u=1829a68a5eda3d301119fdcd6&id=c4a53d2961).
