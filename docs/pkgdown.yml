@@ -7,7 +7,7 @@ articles:
   huff-model: huff-model.html
   regionalization: regionalization.html
   travel-time-matrices: travel-time-matrices.html
-last_built: 2026-01-07T01:37Z
+last_built: 2026-01-07T15:48Z
 urls:
-  reference: https://walker-data.com/spopt/reference
-  article: https://walker-data.com/spopt/articles
+  reference: https://walker-data.com/spopt-r/reference
+  article: https://walker-data.com/spopt-r/articles
