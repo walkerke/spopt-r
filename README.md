@@ -12,15 +12,15 @@ For developers who need to build from source (requires Rust), see [CONTRIBUTING.
 
 Read through these vignettes to learn how to use the package:
 
-- [Getting started with __spopt__](https://walker-data.com/spopt/articles/getting-started.html)
+- [Getting started with __spopt__](https://walker-data.com/spopt-r/articles/getting-started.html)
 
-- [Regionalization](https://walker-data.com/spopt/articles/regionalization.html)
+- [Regionalization](https://walker-data.com/spopt-r/articles/regionalization.html)
 
-- [Facility location](https://walker-data.com/spopt/articles/facility-location.html)
+- [Facility location](https://walker-data.com/spopt-r/articles/facility-location.html)
 
-- [Huff model](https://walker-data.com/spopt/articles/huff-model.html)
+- [Huff model](https://walker-data.com/spopt-r/articles/huff-model.html)
 
-- [Travel-time cost matrices](https://walker-data.com/spopt/articles/travel-time-matrices.html)
+- [Travel-time cost matrices](https://walker-data.com/spopt-r/articles/travel-time-matrices.html)
 
 ## Support and how to learn more
 
