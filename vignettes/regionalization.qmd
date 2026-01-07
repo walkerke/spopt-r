@@ -247,7 +247,7 @@ Ward clustering is deterministic (no random seed needed) and tends to produce co
 Each regionalization algorithm has strengths for different scenarios:
 
 | Algorithm | Best for | Key features |
-|----|----|----|
+|------------------------|------------------------|------------------------|
 | **Max-P** | Population thresholds | Maximizes number of regions meeting constraints |
 | **SKATER** | Fast, interpretable results | Tree-based, good for large datasets |
 | **AZP** | High-quality solutions | Multiple optimization variants |

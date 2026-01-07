@@ -16,7 +16,7 @@ Read through these vignettes to learn how to use the package:
 
 - [Regionalization](https://walker-data.com/spopt-r/articles/regionalization.html)
 
-- [Facility location](https://walker-data.com/spopt-r/articles/facility-location.html)
+- [Facility location problems](https://walker-data.com/spopt-r/articles/facility-location.html)
 
 - [Huff model](https://walker-data.com/spopt-r/articles/huff-model.html)
 

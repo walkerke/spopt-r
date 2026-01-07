@@ -1,5 +1,5 @@
 ---
-title: "Facility location with spopt"
+title: "Solving facility location problems with spopt"
 format: html
 editor: visual
 bibliography: references.bib
@@ -482,7 +482,7 @@ Red circles show the distance-only solution (P-Median), blue circles show the co
 Here's a quick reference for choosing the right algorithm:
 
 | Algorithm | Objective | Use case |
-|-------------------|--------------------------|----------------------------|
+|-------------------|--------------------------|---------------------------|
 | **P-Median** | Minimize total weighted distance | General efficiency; warehouses, retail |
 | **P-Center** | Minimize maximum distance | Equity-focused; emergency services |
 | **MCLP** | Maximize covered demand | Fixed budget; expand coverage |
