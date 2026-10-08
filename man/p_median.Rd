@@ -40,6 +40,7 @@ A list with two sf objects:
 
 \itemize{
 \item \verb{$demand}: Original demand sf with \code{.facility} column (assigned facility)
+and \code{.cost} column (cost to the assigned facility, from the original cost matrix)
 \item \verb{$facilities}: Original facilities sf with \code{.selected} and \code{.n_assigned} columns
 }
 Metadata is stored in the "spopt" attribute.

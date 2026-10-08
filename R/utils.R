@@ -111,6 +111,20 @@ resolve_fixed_facilities <- function(fixed_col, facilities, n_facilities) {
   as.integer(fixed_indices)
 }
 
+# Look up each demand row's cost to its assigned facility.
+# Invalid assignments (NA, 0, out of range) get NA.
+assignment_cost <- function(cost_matrix, assignments) {
+  out <- rep(NA_real_, length(assignments))
+  valid <- which(!is.na(assignments) & assignments >= 1L &
+                   assignments <= ncol(cost_matrix))
+  if (length(valid) > 0) {
+    out[valid] <- as.numeric(
+      as.matrix(cost_matrix)[cbind(valid, assignments[valid])]
+    )
+  }
+  out
+}
+
 # Attach spopt metadata to result
 attach_spopt_metadata <- function(result, metadata) {
   attr(result, "spopt") <- metadata

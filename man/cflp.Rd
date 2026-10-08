@@ -44,7 +44,8 @@ the solver determines the optimal number of facilities to minimize total cost.}
 A list with two sf objects:
 \itemize{
 \item \verb{$demand}: Original demand sf with \code{.facility} column (primary assignment)
-and \code{.split} column (TRUE if demand is split across facilities)
+and \code{.split} column (TRUE if demand is split across facilities), and
+\code{.cost} column (cost to the primary facility, from the original cost matrix)
 \item \verb{$facilities}: Original facilities sf with \code{.selected}, \code{.n_assigned},
 and \code{.utilization} columns
 }

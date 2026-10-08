@@ -20,6 +20,7 @@
 #'
 #'   \itemize{
 #'     \item `$demand`: Original demand sf with `.facility` column (assigned facility)
+#'       and `.cost` column (cost to the assigned facility, from the original cost matrix)
 #'     \item `$facilities`: Original facilities sf with `.selected` and `.n_assigned` columns
 #'   }
 #'   Metadata is stored in the "spopt" attribute.
@@ -106,6 +107,9 @@ p_median <- function(demand,
     cost_matrix <- distance_matrix(demand, facilities, type = distance_metric)
   }
 
+  # Keep original costs for reporting (before NA/Inf replacement)
+  cost_original <- cost_matrix
+
   # Validate cost matrix
   if (any(is.na(cost_matrix))) {
     n_na <- sum(is.na(cost_matrix))
@@ -146,6 +150,7 @@ p_median <- function(demand,
   facilities_result <- facilities
 
   demand_result$.facility <- result$assignments  # 1-based facility index
+  demand_result$.cost <- assignment_cost(cost_original, demand_result$.facility)
 
   selected_indices <- result$selected
   facilities_result$.selected <- seq_len(n_fac) %in% selected_indices
@@ -163,6 +168,7 @@ p_median <- function(demand,
 
   metadata <- list(
     algorithm = "p_median",
+    weight_col = weight_col,
     n_selected = result$n_selected,
     n_facilities = n_facilities,
     objective = result$objective,

@@ -29,7 +29,8 @@
 #'   \itemize{
 #'     \item `$demand`: Original demand sf with added columns:
 #'       \itemize{
-#'         \item `.primary_store`: ID of highest-probability store
+#'         \item `.primary_store`: Row index (1-based) of the highest-probability store
+#'         \item `.cost`: Cost to the primary store, from the original cost matrix
 #'         \item `.entropy`: Competition measure (higher = more competition)
 #'         \item `.prob_<store_id>`: Probability columns for each store
 #'       }
@@ -198,6 +199,9 @@ huff <- function(demand,
     cost_matrix <- distance_matrix(demand, stores, type = distance_metric)
   }
 
+  # Keep original costs for reporting (before NA/Inf replacement)
+  cost_original <- cost_matrix
+
   # Validate cost matrix
   if (any(is.na(cost_matrix))) {
     warning("cost_matrix contains NA values. Replacing with large value.")
@@ -236,6 +240,7 @@ huff <- function(demand,
   # Augment demand sf
   demand_result <- demand
   demand_result$.primary_store <- result$primary_store
+  demand_result$.cost <- assignment_cost(cost_original, demand_result$.primary_store)
   demand_result$.entropy <- result$entropy
 
   # Add probability columns for each store

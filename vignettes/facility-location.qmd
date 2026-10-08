@@ -101,17 +101,21 @@ result_pmedian <- p_median(
 )
 ```
 
-The solver runs quickly with 30 candidates - the optimization scales with the number of candidate sites, not demand points. Let's visualize the results:
+The solver runs quickly with 30 candidates - the optimization scales with the number of candidate sites, not demand points. Each demand point now has a `.facility` column (the row of its assigned facility) and a `.cost` column (the distance to it, here in meters).
+
+To visualize the allocation, `spider_lines()` draws a line from each demand point to the facility that serves it. These are sometimes called *allocation lines* or *desire lines*.
 
 ```{r}
+# One line per tract, from the tract to its assigned facility
+pmedian_lines <- spider_lines(result_pmedian) |>
+  mutate(facility = as.character(facility_index))
+
 # Get selected facility locations
 selected <- result_pmedian$facilities |>
-  filter(.selected) |> 
+  filter(.selected) |>
   mutate(id = as.character(id))
 
-# Color demand points by their assigned facility
-demand_colored <- result_pmedian$demand |>
-  mutate(.facility = as.character(.facility))
+facility_colors <- c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
 
 # Map the results
 maplibre(bounds = tarrant) |>
@@ -121,16 +125,16 @@ maplibre(bounds = tarrant) |>
     fill_color = "lightgray",
     fill_opacity = 0.3
   ) |>
-  add_circle_layer(
-    id = "demand",
-    source = demand_colored,
-    circle_color = match_expr(
-      column = ".facility",
+  add_line_layer(
+    id = "allocations",
+    source = pmedian_lines,
+    line_color = match_expr(
+      column = "facility",
       values = selected$id,
-      stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
+      stops = facility_colors
     ),
-    circle_radius = 4,
-    circle_opacity = 0.7
+    line_width = 1,
+    line_opacity = 0.6
   ) |>
   add_circle_layer(
     id = "facilities",
@@ -138,7 +142,7 @@ maplibre(bounds = tarrant) |>
     circle_color = match_expr(
       column = "id",
       values = selected$id,
-      stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
+      stops = facility_colors
     ),
     circle_radius = 10,
     circle_stroke_color = "white",
@@ -146,7 +150,20 @@ maplibre(bounds = tarrant) |>
   )
 ```
 
-Each demand point is colored by its assigned facility, and the black markers show the selected facility locations. The solution minimizes the total population-weighted distance.
+Each line connects a tract to its assigned facility, colored by facility. The solution minimizes the total population-weighted distance. Along with the geometry, `spider_lines()` returns each link's `weight` (the tract's population) and `cost` (its distance), so you can summarize the allocation directly:
+
+```{r}
+pmedian_lines |>
+  st_drop_geometry() |>
+  group_by(facility) |>
+  summarize(
+    tracts = n(),
+    population = sum(weight),
+    mean_km = weighted.mean(cost, weight) / 1000
+  )
+```
+
+The `facility_index` and `demand_index` columns refer to rows of `result_pmedian$facilities` and `result_pmedian$demand`, so you can join any other attributes back on.
 
 You can access solution metadata through the `spopt` attribute:
 
@@ -226,6 +243,46 @@ cat(sprintf("Coverage: %s of %s (%.1f%%)",
 ```
 
 The `service_radius` parameter defines what "covered" means - any demand point within this distance of a selected facility is considered covered. The algorithm then selects facilities to maximize the total covered population.
+
+Covered demand points are assigned to their nearest selected facility, so `spider_lines()` draws lines only for covered tracts. Uncovered tracts have no assignment and get no line:
+
+```{r}
+mclp_lines <- spider_lines(result_mclp)
+
+uncovered <- result_mclp$demand |>
+  filter(!.covered)
+
+maplibre(bounds = tarrant) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tarrant,
+    fill_color = "lightgray",
+    fill_opacity = 0.3
+  ) |>
+  add_line_layer(
+    id = "covered",
+    source = mclp_lines,
+    line_color = "#2c7fb8",
+    line_width = 1
+  ) |>
+  add_circle_layer(
+    id = "uncovered",
+    source = uncovered,
+    circle_color = "#d7301f",
+    circle_radius = 3,
+    circle_opacity = 0.7
+  ) |>
+  add_circle_layer(
+    id = "facilities",
+    source = filter(result_mclp$facilities, .selected),
+    circle_color = "#2c7fb8",
+    circle_radius = 10,
+    circle_stroke_color = "white",
+    circle_stroke_width = 2
+  )
+```
+
+Red points are tracts outside the 5 km service radius of every selected facility.
 
 ## LSCP: Minimum facilities for full coverage
 
@@ -325,6 +382,49 @@ n_split <- sum(result_cflp$demand$.split)
 cat(sprintf("%d of %d demand points are served by multiple facilities",
             n_split, nrow(demand_pts)))
 ```
+
+By default, `spider_lines()` draws one line per demand point, to its *primary* facility (the one serving the largest share). Use `allocations = "all"` to draw every allocation, so a split demand point gets one line per facility. The `share` column gives the fraction of that point's demand sent along each line, and `weight` gives the population it carries:
+
+```{r}
+cflp_lines <- spider_lines(result_cflp, allocations = "all") |>
+  mutate(split = if_else(demand_index %in% which(result_cflp$demand$.split),
+                         "split", "single"))
+
+maplibre(bounds = tarrant) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tarrant,
+    fill_color = "lightgray",
+    fill_opacity = 0.3
+  ) |>
+  add_line_layer(
+    id = "single",
+    source = filter(cflp_lines, split == "single"),
+    line_color = "#969696",
+    line_width = 0.75,
+    line_opacity = 0.5
+  ) |>
+  add_line_layer(
+    id = "split",
+    source = filter(cflp_lines, split == "split"),
+    line_color = "#d7301f",
+    line_width = interpolate(
+      column = "share",
+      values = c(0, 1),
+      stops = c(1.5, 5)
+    )
+  ) |>
+  add_circle_layer(
+    id = "facilities",
+    source = filter(result_cflp$facilities, .selected),
+    circle_color = "black",
+    circle_radius = 8,
+    circle_stroke_color = "white",
+    circle_stroke_width = 2
+  )
+```
+
+Red lines belong to demand points split across facilities, with line width showing the share of demand sent along each line. Gray lines are demand points served entirely by one facility.
 
 ### Incorporating facility costs
 

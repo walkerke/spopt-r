@@ -39,7 +39,9 @@ always selected; the solver optimizes the remaining slots.}
 \value{
 A list with two sf objects:
 \itemize{
-\item \verb{$demand}: Original demand sf with \code{.facility} column
+\item \verb{$demand}: Original demand sf with \code{.facility} column and \code{.cost}
+column (cost to the assigned facility, from the original cost matrix;
+\code{NA} if unassigned)
 \item \verb{$facilities}: Original facilities sf with \code{.selected} column
 }
 Metadata includes \code{max_distance} (the objective value).

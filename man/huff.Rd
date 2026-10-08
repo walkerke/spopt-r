@@ -48,7 +48,8 @@ A list with:
 \itemize{
 \item \verb{$demand}: Original demand sf with added columns:
 \itemize{
-\item \code{.primary_store}: ID of highest-probability store
+\item \code{.primary_store}: Row index (1-based) of the highest-probability store
+\item \code{.cost}: Cost to the primary store, from the original cost matrix
 \item \code{.entropy}: Competition measure (higher = more competition)
 \item \verb{.prob_<store_id>}: Probability columns for each store
 }

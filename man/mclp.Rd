@@ -42,7 +42,9 @@ expansion planning where some facilities already exist.}
 \value{
 A list with two sf objects:
 \itemize{
-\item \verb{$demand}: Original demand sf with \code{.covered} and \code{.facility} columns
+\item \verb{$demand}: Original demand sf with \code{.covered}, \code{.facility}, and
+\code{.cost} columns (\code{.cost} is the cost to the assigned facility, from the
+original cost matrix; \code{NA} if uncovered)
 \item \verb{$facilities}: Original facilities sf with \code{.selected} column
 }
 Metadata is stored in the "spopt" attribute.

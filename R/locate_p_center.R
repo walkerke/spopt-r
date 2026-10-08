@@ -20,7 +20,9 @@
 #'
 #' @return A list with two sf objects:
 #'   \itemize{
-#'     \item `$demand`: Original demand sf with `.facility` column
+#'     \item `$demand`: Original demand sf with `.facility` column and `.cost`
+#'       column (cost to the assigned facility, from the original cost matrix;
+#'       `NA` if unassigned)
 #'     \item `$facilities`: Original facilities sf with `.selected` column
 #'   }
 #'   Metadata includes `max_distance` (the objective value).
@@ -111,6 +113,9 @@ p_center <- function(demand,
     cost_matrix <- distance_matrix(demand, facilities, type = distance_metric)
   }
 
+  # Keep original costs for reporting (before NA/Inf replacement)
+  cost_original <- cost_matrix
+
   # Validate cost matrix for NA/Inf values
   if (any(is.na(cost_matrix))) {
     n_na <- sum(is.na(cost_matrix))
@@ -146,6 +151,7 @@ p_center <- function(demand,
   facilities_result <- facilities
 
   demand_result$.facility <- result$assignments  # 1-based facility index
+  demand_result$.cost <- assignment_cost(cost_original, demand_result$.facility)
   selected_indices <- result$selected
   facilities_result$.selected <- seq_len(n_fac) %in% selected_indices
   facilities_result$.fixed <- if (!is.null(fixed_facilities)) seq_len(n_fac) %in% fixed_facilities else rep(FALSE, n_fac)

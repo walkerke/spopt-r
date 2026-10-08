@@ -1,7 +1,7 @@
 Package: spopt
 Title: Spatial Optimization for Regionalization, Facility Location, and Market Analysis
-Version: 0.1.2
-Date: 2026-04-16
+Version: 0.1.2.9000
+Date: 2026-04-25
 Authors@R: c(
     person("Kyle", "Walker", , "kyle@walker-data.com", role = c("aut", "cre")),
     person("PySAL Developers", role = "cph",

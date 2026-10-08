@@ -61,6 +61,7 @@ reference:
   - mclp
   - cflp
   - frlm
+  - spider_lines
 
 - title: Route Optimization
   desc: Single- and multi-vehicle routing

@@ -23,7 +23,8 @@
 #' @return A list with two sf objects:
 #'   \itemize{
 #'     \item `$demand`: Original demand sf with `.facility` column (primary assignment)
-#'       and `.split` column (TRUE if demand is split across facilities)
+#'       and `.split` column (TRUE if demand is split across facilities), and
+#'       `.cost` column (cost to the primary facility, from the original cost matrix)
 #'     \item `$facilities`: Original facilities sf with `.selected`, `.n_assigned`,
 #'       and `.utilization` columns
 #'   }
@@ -166,6 +167,9 @@ cflp <- function(demand,
     cost_matrix <- distance_matrix(demand, facilities, type = distance_metric)
   }
 
+  # Keep original costs for reporting (before NA/Inf replacement)
+  cost_original <- cost_matrix
+
   # Validate cost matrix
   if (any(is.na(cost_matrix))) {
     n_na <- sum(is.na(cost_matrix))
@@ -210,6 +214,7 @@ cflp <- function(demand,
   facilities_result <- facilities
 
   demand_result$.facility <- result$assignments  # Primary assignment (1-based)
+  demand_result$.cost <- assignment_cost(cost_original, demand_result$.facility)
 
   # Determine which demands are split
   allocation_matrix <- matrix(
@@ -241,6 +246,7 @@ cflp <- function(demand,
 
   metadata <- list(
     algorithm = "cflp",
+    weight_col = weight_col,
     n_selected = result$n_selected,
     n_facilities = n_facilities,
     objective = result$objective,

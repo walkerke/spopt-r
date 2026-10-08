@@ -288,6 +288,49 @@ maplibre(bounds = tracts) |>
 
 Each demand point is colored by its assigned facility. Notice how the service areas follow the road network structure rather than forming simple circular regions; look in particular along major highways.
 
+### Spider lines with travel times
+
+`spider_lines()` draws a line from each demand point to its assigned facility. When the solver used a travel-time matrix, each demand point's `.cost` column holds the drive time to its assigned facility. `spider_lines()` picks this up automatically as a `cost` column, so the lines can be styled by drive time:
+
+```{r}
+tt_lines <- spider_lines(result_tt)
+
+summary(tt_lines$cost)
+
+maplibre(bounds = tracts) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tracts,
+    fill_color = "lightgray",
+    fill_opacity = 0.2
+  ) |>
+  add_line_layer(
+    id = "allocations",
+    source = tt_lines,
+    line_color = interpolate(
+      column = "cost",
+      values = c(5, 15, 30),
+      stops = c("#fee08b", "#f46d43", "#a50026")
+    ),
+    line_width = 1.5
+  ) |>
+  add_circle_layer(
+    id = "facilities",
+    source = facilities_tt,
+    circle_radius = 10,
+    circle_color = "black",
+    circle_stroke_color = "white",
+    circle_stroke_width = 2
+  ) |>
+  add_legend(
+    "Drive time (minutes)",
+    values = c(5, 15, 30),
+    colors = c("#fee08b", "#f46d43", "#a50026")
+  )
+```
+
+The lines are straight, but their color reflects drive time over the road network, so the longest trips stand out. To draw lines that follow the roads themselves, pass a routing function to the `route_fun` argument of `spider_lines()`; see `?spider_lines` for an OSRM example.
+
 ## Best practices
 
 When working with travel-time matrices:

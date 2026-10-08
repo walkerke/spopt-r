@@ -30,7 +30,9 @@ If NULL, computed from geometries.}
 \value{
 A list with two sf objects:
 \itemize{
-\item \verb{$demand}: Original demand sf with \code{.covered} column (logical)
+\item \verb{$demand}: Original demand sf with \code{.covered} column (logical),
+\code{.facility} (nearest selected facility), and \code{.cost} (cost to that
+facility, from the original cost matrix; \code{NA} if uncovered)
 \item \verb{$facilities}: Original facilities sf with \code{.selected} column (logical)
 }
 Metadata is stored in the "spopt" attribute.

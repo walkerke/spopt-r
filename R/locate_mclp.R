@@ -19,7 +19,9 @@
 #'
 #' @return A list with two sf objects:
 #'   \itemize{
-#'     \item `$demand`: Original demand sf with `.covered` and `.facility` columns
+#'     \item `$demand`: Original demand sf with `.covered`, `.facility`, and
+#'       `.cost` columns (`.cost` is the cost to the assigned facility, from the
+#'       original cost matrix; `NA` if uncovered)
 #'     \item `$facilities`: Original facilities sf with `.selected` column
 #'   }
 #'   Metadata is stored in the "spopt" attribute.
@@ -113,6 +115,9 @@ mclp <- function(demand,
     cost_matrix <- distance_matrix(demand, facilities, type = distance_metric)
   }
 
+  # Keep original costs for reporting (before NA/Inf replacement)
+  cost_original <- cost_matrix
+
   # Validate cost matrix for NA/Inf values
   if (any(is.na(cost_matrix))) {
     n_na <- sum(is.na(cost_matrix))
@@ -176,6 +181,8 @@ mclp <- function(demand,
     }
   }
 
+  demand_result$.cost <- assignment_cost(cost_original, demand_result$.facility)
+
   facilities_result$.selected <- seq_len(n_fac) %in% selected_indices
   facilities_result$.fixed <- if (!is.null(fixed_facilities)) seq_len(n_fac) %in% fixed_facilities else rep(FALSE, n_fac)
   facilities_result$.n_assigned <- 0L
@@ -191,6 +198,7 @@ mclp <- function(demand,
 
   metadata <- list(
     algorithm = "mclp",
+    weight_col = weight_col,
     n_selected = result$n_selected,
     objective = result$objective,
     service_radius = service_radius,

@@ -13,7 +13,9 @@
 #'
 #' @return A list with two sf objects:
 #'   \itemize{
-#'     \item `$demand`: Original demand sf with `.covered` column (logical)
+#'     \item `$demand`: Original demand sf with `.covered` column (logical),
+#'       `.facility` (nearest selected facility), and `.cost` (cost to that
+#'       facility, from the original cost matrix; `NA` if uncovered)
 #'     \item `$facilities`: Original facilities sf with `.selected` column (logical)
 #'   }
 #'   Metadata is stored in the "spopt" attribute.
@@ -93,6 +95,9 @@ lscp <- function(demand,
     cost_matrix <- distance_matrix(demand, facilities, type = distance_metric)
   }
 
+  # Keep original costs for reporting (before NA/Inf replacement)
+  cost_original <- cost_matrix
+
   # Validate cost matrix for NA/Inf values
   if (any(is.na(cost_matrix))) {
     n_na <- sum(is.na(cost_matrix))
@@ -149,6 +154,8 @@ lscp <- function(demand,
       demand_result$.facility[i] <- selected_indices[which.min(dists)]
     }
   }
+
+  demand_result$.cost <- assignment_cost(cost_original, demand_result$.facility)
 
   # Mark selected facilities
   facilities_result$.selected <- seq_len(n_facilities) %in% selected_indices
