@@ -33,7 +33,8 @@
 #'   Identical coordinate pairs are sent only once. It must return an sf or
 #'   sfc object with one LINESTRING or MULTILINESTRING per row, in input order,
 #'   with a known CRS. Return an empty geometry for a pair that cannot be
-#'   routed; those links fall back to straight lines.
+#'   routed; those links fall back to straight lines. [r5r_route_fun()]
+#'   builds such a function from an r5r network.
 #'
 #' @return An sf object in the CRS of `result$demand`, one row per link, with
 #'   columns:
@@ -99,7 +100,8 @@
 #' routed <- spider_lines(result, route_fun = osrm_lines)
 #' }
 #'
-#' @seealso [p_median()], [mclp()], [cflp()], [huff()]
+#' @seealso [r5r_route_fun()] for road-following lines with r5r;
+#'   [p_median()], [mclp()], [cflp()], [huff()]
 #'
 #' @export
 spider_lines <- function(result,

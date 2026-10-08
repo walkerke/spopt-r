@@ -329,7 +329,23 @@ maplibre(bounds = tracts) |>
   )
 ```
 
-The lines are straight, but their color reflects drive time over the road network, so the longest trips stand out. To draw lines that follow the roads themselves, pass a routing function to the `route_fun` argument of `spider_lines()`; see `?spider_lines` for an OSRM example.
+The lines are straight, but their color reflects drive time over the road network, so the longest trips stand out.
+
+To draw lines that follow the roads themselves, pass a routing function to the `route_fun` argument of `spider_lines()`. `r5r_route_fun()` builds one from the same r5r network used to compute the travel-time matrix above:
+
+```{r}
+#| eval: false
+routed_lines <- spider_lines(
+  result_tt,
+  route_fun = r5r_route_fun(
+    r5r_core,
+    mode = "CAR",
+    departure_datetime = as.POSIXct("2026-10-07 08:00:00")
+  )
+)
+```
+
+Each spider line then traces the driving route between a tract and its assigned facility. r5r routes every pair in one batched call. Any pair it can't route falls back to a straight line, flagged by `routed == FALSE`. For other routers such as OSRM, see the example in `?spider_lines`.
 
 ## Best practices
 

@@ -483,3 +483,39 @@ test_that("non-finite endpoint coordinates are dropped and counted", {
   expect_true(all(is.finite(as.numeric(lines$length))))
   expect_equal(attr(lines, "spopt")$n_invalid_geometry, 2)
 })
+
+# ---------------------------------------------------------------------------
+# r5r itinerary assembly (no Java needed)
+# ---------------------------------------------------------------------------
+
+test_that(".assemble_itineraries orders legs, keeps option 1, fills gaps", {
+  leg <- function(...) st_linestring(rbind(...))
+  it <- st_sf(
+    from_id = c("1", "1", "1", "3"),
+    to_id = c("1", "1", "1", "3"),
+    option = c(1L, 1L, 2L, 1L),
+    segment = c(2L, 1L, 1L, 1L),
+    geometry = st_sfc(
+      leg(c(1, 1), c(2, 2)),          # pair 1, option 1, segment 2
+      leg(c(0, 0), c(1, 1)),          # pair 1, option 1, segment 1
+      leg(c(0, 0), c(5, 5)),          # pair 1, option 2 (ignored)
+      leg(c(3, 3), c(4, 4), c(5, 3)), # pair 3
+      crs = 4326
+    )
+  )
+  out <- spopt:::.assemble_itineraries(it, ids = c("1", "2", "3"))
+
+  expect_s3_class(out, "sfc")
+  expect_equal(length(out), 3)
+  expect_equal(st_crs(out), st_crs(4326))
+  expect_true(st_is_empty(out[2]))  # pair 2 had no itinerary
+
+  p1 <- unclass(out[[1]])
+  expect_length(p1, 2)
+  expect_equal(p1[[1]][1, ], c(0, 0))  # segment 1 first
+  expect_equal(p1[[2]][2, ], c(2, 2))
+  expect_equal(nrow(unclass(out[[3]])[[1]]), 3)
+
+  none <- spopt:::.assemble_itineraries(it[0, ], ids = c("1", "2"))
+  expect_true(all(st_is_empty(none)))
+})

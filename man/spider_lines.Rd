@@ -46,7 +46,8 @@ an \code{id} column; row \emph{i} of \code{from} should be routed to row \emph{i
 Identical coordinate pairs are sent only once. It must return an sf or
 sfc object with one LINESTRING or MULTILINESTRING per row, in input order,
 with a known CRS. Return an empty geometry for a pair that cannot be
-routed; those links fall back to straight lines.}
+routed; those links fall back to straight lines. \code{\link[=r5r_route_fun]{r5r_route_fun()}}
+builds such a function from an r5r network.}
 }
 \value{
 An sf object in the CRS of \code{result$demand}, one row per link, with
@@ -122,5 +123,6 @@ routed <- spider_lines(result, route_fun = osrm_lines)
 
 }
 \seealso{
+\code{\link[=r5r_route_fun]{r5r_route_fun()}} for road-following lines with r5r;
 \code{\link[=p_median]{p_median()}}, \code{\link[=mclp]{mclp()}}, \code{\link[=cflp]{cflp()}}, \code{\link[=huff]{huff()}}
 }

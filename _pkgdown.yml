@@ -62,6 +62,7 @@ reference:
   - cflp
   - frlm
   - spider_lines
+  - r5r_route_fun
 
 - title: Route Optimization
   desc: Single- and multi-vehicle routing
