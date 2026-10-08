@@ -11,7 +11,7 @@ distance_matrix_geographic(x, y = NULL, use_centroids = NULL)
 
 \item{y}{An sf object or NULL}
 
-\item{use_centroids}{Logical. If TRUE, use polygon centroids.}
+\item{use_centroids}{Logical. If TRUE, use geometry centroids.}
 }
 \value{
 A numeric matrix of distances in meters.

@@ -19,7 +19,9 @@ distance_matrix(
 \item{type}{Distance type: "euclidean" (default) or "manhattan". Note that for
 geographic CRS, only "euclidean" (great circle) distance is available.}
 
-\item{use_centroids}{Logical. If TRUE (default for polygons), use polygon centroids.}
+\item{use_centroids}{Logical. If TRUE, use geometry centroids. Defaults to
+TRUE when any geometry is not a POINT (polygons, multipoints, lines), so
+each feature contributes exactly one row or column.}
 }
 \value{
 A numeric matrix of distances. Rows correspond to x, columns to y.

@@ -9,7 +9,9 @@
 #' @param y An sf object (facility locations). If NULL, computes distances within x.
 #' @param type Distance type: "euclidean" (default) or "manhattan". Note that for
 #'   geographic CRS, only "euclidean" (great circle) distance is available.
-#' @param use_centroids Logical. If TRUE (default for polygons), use polygon centroids.
+#' @param use_centroids Logical. If TRUE, use geometry centroids. Defaults to
+#'   TRUE when any geometry is not a POINT (polygons, multipoints, lines), so
+#'   each feature contributes exactly one row or column.
 #'
 #' @return A numeric matrix of distances. Rows correspond to x, columns to y.
 #'   For geographic CRS, distances are in meters. For projected CRS, distances
@@ -47,16 +49,16 @@ distance_matrix <- function(x, y = NULL, type = c("euclidean", "manhattan"),
   }
 
   # For projected CRS, use fast Euclidean/Manhattan calculation
-  # Determine if we should use centroids
+  # Non-point geometries are reduced to centroids (one row per feature)
   geom_type_x <- unique(sf::st_geometry_type(x))
-  is_polygon_x <- any(geom_type_x %in% c("POLYGON", "MULTIPOLYGON"))
+  non_point_x <- any(geom_type_x != "POINT")
 
   if (is.null(use_centroids)) {
-    use_centroids <- is_polygon_x
+    use_centroids <- non_point_x
   }
 
   # Extract coordinates
-  if (use_centroids || is_polygon_x) {
+  if (use_centroids || non_point_x) {
     coords_x <- sf::st_coordinates(sf::st_centroid(sf::st_geometry(x)))
   } else {
     coords_x <- sf::st_coordinates(x)
@@ -66,9 +68,9 @@ distance_matrix <- function(x, y = NULL, type = c("euclidean", "manhattan"),
     coords_y <- coords_x
   } else {
     geom_type_y <- unique(sf::st_geometry_type(y))
-    is_polygon_y <- any(geom_type_y %in% c("POLYGON", "MULTIPOLYGON"))
+    non_point_y <- any(geom_type_y != "POINT")
 
-    if (use_centroids || is_polygon_y) {
+    if (use_centroids || non_point_y) {
       coords_y <- sf::st_coordinates(sf::st_centroid(sf::st_geometry(y)))
     } else {
       coords_y <- sf::st_coordinates(y)
@@ -114,22 +116,22 @@ distance_matrix <- function(x, y = NULL, type = c("euclidean", "manhattan"),
 #'
 #' @param x An sf object
 #' @param y An sf object or NULL
-#' @param use_centroids Logical. If TRUE, use polygon centroids.
+#' @param use_centroids Logical. If TRUE, use geometry centroids.
 #'
 #' @return A numeric matrix of distances in meters.
 #'
 #' @keywords internal
 distance_matrix_geographic <- function(x, y = NULL, use_centroids = NULL) {
-  # Determine if we should use centroids
+  # Non-point geometries are reduced to centroids (one row per feature)
   geom_type_x <- unique(sf::st_geometry_type(x))
-  is_polygon_x <- any(geom_type_x %in% c("POLYGON", "MULTIPOLYGON"))
+  non_point_x <- any(geom_type_x != "POINT")
 
   if (is.null(use_centroids)) {
-    use_centroids <- is_polygon_x
+    use_centroids <- non_point_x
   }
 
   # Get geometries (with centroids if needed)
-  if (use_centroids || is_polygon_x) {
+  if (use_centroids || non_point_x) {
     geom_x <- sf::st_centroid(sf::st_geometry(x))
   } else {
     geom_x <- sf::st_geometry(x)
@@ -139,9 +141,9 @@ distance_matrix_geographic <- function(x, y = NULL, use_centroids = NULL) {
     geom_y <- geom_x
   } else {
     geom_type_y <- unique(sf::st_geometry_type(y))
-    is_polygon_y <- any(geom_type_y %in% c("POLYGON", "MULTIPOLYGON"))
+    non_point_y <- any(geom_type_y != "POINT")
 
-    if (use_centroids || is_polygon_y) {
+    if (use_centroids || non_point_y) {
       geom_y <- sf::st_centroid(sf::st_geometry(y))
     } else {
       geom_y <- sf::st_geometry(y)

@@ -419,10 +419,7 @@ test_that("MULTIPOINT and Z geometries are accepted", {
   demand <- st_sf(pop = c(1, 1), geometry = mp)
   facilities <- st_as_sf(data.frame(x = c(1, 6), y = c(0, 6), z = c(9, 9)),
                          coords = c("x", "y", "z"))
-  # distance_matrix() doesn't handle MULTIPOINT, so supply costs directly
-  cm <- matrix(c(1, 9, 9, 1), 2)
-  res <- p_median(demand, facilities, n_facilities = 2, weight_col = "pop",
-                  cost_matrix = cm)
+  res <- p_median(demand, facilities, n_facilities = 2, weight_col = "pop")
   lines <- spider_lines(res)
   expect_equal(nrow(lines), 2)
   expect_equal(unname(line_ends(lines)$start),
