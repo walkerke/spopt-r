@@ -1,6 +1,5 @@
 test_that("lscp returns correct structure", {
   skip_if_not_installed("sf")
-  skip("Rust compilation required")
 
   # Create simple test data
   set.seed(42)
@@ -24,7 +23,6 @@ test_that("lscp returns correct structure", {
 
 test_that("lscp covers all demand when feasible", {
   skip_if_not_installed("sf")
-  skip("Rust compilation required")
 
   # Dense facilities should cover everything
   set.seed(42)

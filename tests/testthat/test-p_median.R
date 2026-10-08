@@ -1,6 +1,5 @@
 test_that("p_median returns correct structure", {
   skip_if_not_installed("sf")
-  skip("Rust compilation required")
 
   set.seed(42)
   demand <- sf::st_as_sf(
@@ -24,7 +23,6 @@ test_that("p_median returns correct structure", {
 
 test_that("p_median assigns all demand to selected facilities", {
   skip_if_not_installed("sf")
-  skip("Rust compilation required")
 
   set.seed(42)
   demand <- sf::st_as_sf(
