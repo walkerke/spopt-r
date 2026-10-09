@@ -30,8 +30,8 @@ test_that("MULTIPOINT works in geographic CRS", {
   d <- distance_matrix(mp, pts)
   expect_equal(dim(d), c(2L, 2L))
   expect_equal(
-    unname(d),
-    unname(units::drop_units(st_distance(st_centroid(st_geometry(mp)), pts))),
+    as.numeric(d),
+    as.numeric(st_distance(st_centroid(st_geometry(mp)), pts)),
     tolerance = 1e-6
   )
 })
