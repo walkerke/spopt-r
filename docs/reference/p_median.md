@@ -62,7 +62,8 @@ p_median(
 A list with two sf objects:
 
 - `$demand`: Original demand sf with `.facility` column (assigned
-  facility)
+  facility) and `.cost` column (cost to the assigned facility, from the
+  original cost matrix)
 
 - `$facilities`: Original facilities sf with `.selected` and
   `.n_assigned` columns
@@ -134,6 +135,6 @@ result <- p_median(demand, facilities, n_facilities = 5, weight_col = "populatio
 
 # Mean distance to assigned facility
 attr(result, "spopt")$mean_distance
-#> [1] 0.1604534
+#> [1] 0.1743598
 # }
 ```

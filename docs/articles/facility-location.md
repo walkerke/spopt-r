@@ -36,6 +36,7 @@ tract centroids as demand points, and sample 30 candidate locations from
 across the county to represent potential facility sites.
 
 ``` r
+
 library(spopt)
 library(tidycensus)
 library(tidyverse)
@@ -74,6 +75,7 @@ facility locations. This setup mirrors real-world planning where you’re
 evaluating a shortlist of potential sites.
 
 ``` r
+
 # Visualize the setup
 maplibre(bounds = tarrant) |>
   add_fill_layer(
@@ -107,6 +109,7 @@ This is the classic efficiency-focused location model - it finds
 locations that minimize how far people, on average, must travel.
 
 ``` r
+
 result_pmedian <- p_median(
   demand = demand_pts,
   facilities = candidate_pts,
@@ -116,18 +119,27 @@ result_pmedian <- p_median(
 ```
 
 The solver runs quickly with 30 candidates - the optimization scales
-with the number of candidate sites, not demand points. Let’s visualize
-the results:
+with the number of candidate sites, not demand points. Each demand point
+now has a `.facility` column (the row of its assigned facility) and a
+`.cost` column (the distance to it, here in meters).
+
+To visualize the allocation,
+[`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md)
+draws a line from each demand point to the facility that serves it.
+These are sometimes called *allocation lines* or *desire lines*.
 
 ``` r
+
+# One line per tract, from the tract to its assigned facility
+pmedian_lines <- spider_lines(result_pmedian) |>
+  mutate(facility = as.character(facility_index))
+
 # Get selected facility locations
 selected <- result_pmedian$facilities |>
-  filter(.selected) |> 
+  filter(.selected) |>
   mutate(id = as.character(id))
 
-# Color demand points by their assigned facility
-demand_colored <- result_pmedian$demand |>
-  mutate(.facility = as.character(.facility))
+facility_colors <- c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
 
 # Map the results
 maplibre(bounds = tarrant) |>
@@ -137,16 +149,16 @@ maplibre(bounds = tarrant) |>
     fill_color = "lightgray",
     fill_opacity = 0.3
   ) |>
-  add_circle_layer(
-    id = "demand",
-    source = demand_colored,
-    circle_color = match_expr(
-      column = ".facility",
+  add_line_layer(
+    id = "allocations",
+    source = pmedian_lines,
+    line_color = match_expr(
+      column = "facility",
       values = selected$id,
-      stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
+      stops = facility_colors
     ),
-    circle_radius = 4,
-    circle_opacity = 0.7
+    line_width = 1,
+    line_opacity = 0.6
   ) |>
   add_circle_layer(
     id = "facilities",
@@ -154,7 +166,7 @@ maplibre(bounds = tarrant) |>
     circle_color = match_expr(
       column = "id",
       values = selected$id,
-      stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
+      stops = facility_colors
     ),
     circle_radius = 10,
     circle_stroke_color = "white",
@@ -162,18 +174,50 @@ maplibre(bounds = tarrant) |>
   )
 ```
 
-Each demand point is colored by its assigned facility, and the black
-markers show the selected facility locations. The solution minimizes the
-total population-weighted distance.
+Each line connects a tract to its assigned facility, colored by
+facility. The solution minimizes the total population-weighted distance.
+Along with the geometry,
+[`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md)
+returns each link’s `weight` (the tract’s population) and `cost` (its
+distance), so you can summarize the allocation directly:
+
+``` r
+
+pmedian_lines |>
+  st_drop_geometry() |>
+  group_by(facility) |>
+  summarize(
+    tracts = n(),
+    population = sum(weight),
+    mean_km = weighted.mean(cost, weight) / 1000
+  )
+```
+
+    # A tibble: 5 × 4
+      facility tracts population mean_km
+      <chr>     <int>      <dbl>   <dbl>
+    1 14           59     330421    6.85
+    2 18          108     430427    7.72
+    3 27           81     429709    8.78
+    4 28          101     496283    8.39
+    5 7            99     448903    7.01
+
+The `facility_index` and `demand_index` columns refer to rows of
+`result_pmedian$facilities` and `result_pmedian$demand`, so you can join
+any other attributes back on.
 
 You can access solution metadata through the `spopt` attribute:
 
 ``` r
+
 attr(result_pmedian, "spopt")
 ```
 
     $algorithm
     [1] "p_median"
+
+    $weight_col
+    [1] "population"
 
     $n_selected
     [1] 5
@@ -197,7 +241,7 @@ attr(result_pmedian, "spopt")
     NULL
 
     $solve_time
-    [1] 0.7514222
+    [1] 0.514914
 
 The `objective` value represents the total weighted distance - lower is
 better.
@@ -211,6 +255,7 @@ emergency services where we need to guarantee that *everyone* is within
 a reasonable distance.
 
 ``` r
+
 result_pcenter <- p_center(
   demand = demand_pts,
   facilities = candidate_pts,
@@ -260,6 +305,7 @@ useful when you have budget constraints but want to cover as many people
 as possible.
 
 ``` r
+
 result_mclp <- mclp(
   demand = demand_pts,
   facilities = candidate_pts,
@@ -289,6 +335,52 @@ point within this distance of a selected facility is considered covered.
 The algorithm then selects facilities to maximize the total covered
 population.
 
+Covered demand points are assigned to their nearest selected facility,
+so
+[`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md)
+draws lines only for covered tracts. Uncovered tracts have no assignment
+and get no line:
+
+``` r
+
+mclp_lines <- spider_lines(result_mclp)
+
+uncovered <- result_mclp$demand |>
+  filter(!.covered)
+
+maplibre(bounds = tarrant) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tarrant,
+    fill_color = "lightgray",
+    fill_opacity = 0.3
+  ) |>
+  add_line_layer(
+    id = "covered",
+    source = mclp_lines,
+    line_color = "#2c7fb8",
+    line_width = 1
+  ) |>
+  add_circle_layer(
+    id = "uncovered",
+    source = uncovered,
+    circle_color = "#d7301f",
+    circle_radius = 3,
+    circle_opacity = 0.7
+  ) |>
+  add_circle_layer(
+    id = "facilities",
+    source = filter(result_mclp$facilities, .selected),
+    circle_color = "#2c7fb8",
+    circle_radius = 10,
+    circle_stroke_color = "white",
+    circle_stroke_width = 2
+  )
+```
+
+Red points are tracts outside the 5 km service radius of every selected
+facility.
+
 ## LSCP: Minimum facilities for full coverage
 
 The *Location Set Covering Problem* (LSCP) ([Toregas et al.
@@ -297,6 +389,7 @@ the minimum number of facilities needed to cover *all* demand within a
 service radius?
 
 ``` r
+
 result_lscp <- lscp(
   demand = demand_pts,
   facilities = candidate_pts,
@@ -326,6 +419,7 @@ P-Dispersion is also useful for environmental monitoring networks or
 cell tower placement where you want sensors spread across a region.
 
 ``` r
+
 result_pdispersion <- p_dispersion(
   facilities = candidate_pts,
   n_facilities = 10
@@ -370,6 +464,7 @@ lot size, zoning, or building constraints. Let’s simulate a realistic
 scenario with small, medium, and large sites:
 
 ``` r
+
 # Create candidates with varying capacities
 set.seed(1983)
 candidate_facilities <- candidate_pts |>
@@ -413,6 +508,7 @@ When demand exceeds capacity at the nearest facility, the solver splits
 demand across multiple facilities:
 
 ``` r
+
 # How many demand points are split?
 n_split <- sum(result_cflp$demand$.split)
 cat(sprintf("%d of %d demand points are served by multiple facilities",
@@ -420,6 +516,58 @@ cat(sprintf("%d of %d demand points are served by multiple facilities",
 ```
 
     2 of 448 demand points are served by multiple facilities
+
+By default,
+[`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md)
+draws one line per demand point, to its *primary* facility (the one
+serving the largest share). Use `allocations = "all"` to draw every
+allocation, so a split demand point gets one line per facility. The
+`share` column gives the fraction of that point’s demand sent along each
+line, and `weight` gives the population it carries:
+
+``` r
+
+cflp_lines <- spider_lines(result_cflp, allocations = "all") |>
+  mutate(split = if_else(demand_index %in% which(result_cflp$demand$.split),
+                         "split", "single"))
+
+maplibre(bounds = tarrant) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tarrant,
+    fill_color = "lightgray",
+    fill_opacity = 0.3
+  ) |>
+  add_line_layer(
+    id = "single",
+    source = filter(cflp_lines, split == "single"),
+    line_color = "#969696",
+    line_width = 0.75,
+    line_opacity = 0.5
+  ) |>
+  add_line_layer(
+    id = "split",
+    source = filter(cflp_lines, split == "split"),
+    line_color = "#d7301f",
+    line_width = interpolate(
+      column = "share",
+      values = c(0, 1),
+      stops = c(1.5, 5)
+    )
+  ) |>
+  add_circle_layer(
+    id = "facilities",
+    source = filter(result_cflp$facilities, .selected),
+    circle_color = "black",
+    circle_radius = 8,
+    circle_stroke_color = "white",
+    circle_stroke_width = 2
+  )
+```
+
+Red lines belong to demand points split across facilities, with line
+width showing the share of demand sent along each line. Gray lines are
+demand points served entirely by one facility.
 
 ### Incorporating facility costs
 
@@ -434,6 +582,7 @@ distance). The key is scaling costs appropriately - fixed costs should
 be comparable to total transportation costs:
 
 ``` r
+
 # Add costs based on site size
 # Scale to be comparable with total transport costs (population * distance)
 candidate_with_costs <- candidate_facilities |>
@@ -473,6 +622,7 @@ more than peripheral ones. Let’s create a realistic scenario where costs
 increase toward the county centroid:
 
 ``` r
+
 # Calculate distance from county centroid (proxy for "centrality")
 county_centroid <- st_centroid(county_boundary)
 
@@ -497,6 +647,7 @@ candidate_with_realestate <- candidate_facilities |>
 Let’s visualize how costs vary across the county:
 
 ``` r
+
 maplibre(bounds = tarrant) |>
   add_fill_layer(
     id = "tracts",
@@ -529,6 +680,7 @@ Now let’s compare two solutions: one ignoring costs (P-Median) and one
 incorporating real estate costs:
 
 ``` r
+
 # Solution ignoring costs (just minimize distance)
 result_no_cost <- p_median(
   demand = demand_pts,
@@ -558,6 +710,7 @@ selected_with_cost <- result_with_realestate$facilities |>
 ```
 
 ``` r
+
 # Side-by-side comparison
 maplibre(bounds = tarrant) |>
   add_fill_layer(
@@ -637,6 +790,7 @@ vignette for how to generate travel time matrices using r5r, and then
 pass them to these functions.
 
 ``` r
+
 # Example with custom cost matrix
 cost_mat <- my_travel_time_matrix  # Generated from r5r or similar
 
@@ -673,9 +827,10 @@ Hakimi, S. L. 1964. “Optimum Locations of Switching Centers and the
 Absolute Centers and Medians of a Graph.” *Operations Research* 12 (3):
 450–59. <https://doi.org/10.1287/opre.12.3.450>.
 
-———. 1965. “Optimum Distribution of Switching Centers in a Communication
-Network and Some Related Graph Theoretic Problems.” *Operations
-Research* 13 (3): 462–75. <https://doi.org/10.1287/opre.13.3.462>.
+Hakimi, S. L. 1965. “Optimum Distribution of Switching Centers in a
+Communication Network and Some Related Graph Theoretic Problems.”
+*Operations Research* 13 (3): 462–75.
+<https://doi.org/10.1287/opre.13.3.462>.
 
 Kuby, M. J. 1987. “Programming Models for Facility Dispersion: The
 p-Dispersion and Maxisum Dispersion Problems.” *Geographical Analysis*

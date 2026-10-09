@@ -33,6 +33,10 @@ Optimal facility siting algorithms
   Capacitated Facility Location Problem (CFLP)
 - [`frlm()`](https://walker-data.com/spopt-r/reference/frlm.md) : Flow
   Refueling Location Model (FRLM)
+- [`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md)
+  : Spider lines for location-allocation results
+- [`r5r_route_fun()`](https://walker-data.com/spopt-r/reference/r5r_route_fun.md)
+  : Road-following spider lines with r5r
 
 ## Route Optimization
 

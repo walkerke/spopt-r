@@ -20,28 +20,30 @@ function initializeLegendInteractivity(map, mapId, config) {
         return;
     }
 
-    // Ensure layer state tracking exists
-    if (!window._mapglLayerState) {
-        window._mapglLayerState = {};
-    }
-    if (!window._mapglLayerState[mapId]) {
-        window._mapglLayerState[mapId] = {
-            filters: {},
-            paintProperties: {},
-            layoutProperties: {},
-            tooltips: {},
-            popups: {},
-            legends: {},
-            interactiveFilters: {}
-        };
-    }
-
-    var layerState = window._mapglLayerState[mapId];
-
-    // Ensure interactiveFilters exists (state object may have been created
-    // by map init code without this property)
-    if (!layerState.interactiveFilters) {
-        layerState.interactiveFilters = {};
+    // Ensure layer state tracking exists via the shared helper that the
+    // main binding files install on window. Falls back to a local init if
+    // the helper isn't available (e.g. legacy load order), keeping the
+    // interactiveFilters field the legend UI depends on.
+    var layerState;
+    if (typeof window._mapglEnsureLayerState === "function") {
+        layerState = window._mapglEnsureLayerState(map);
+    } else {
+        if (!window._mapglLayerState) window._mapglLayerState = {};
+        if (!window._mapglLayerState[mapId]) {
+            window._mapglLayerState[mapId] = {
+                filters: {},
+                paintProperties: {},
+                layoutProperties: {},
+                tooltips: {},
+                popups: {},
+                legends: {},
+                interactiveFilters: {},
+                filterStack: {}
+            };
+        }
+        layerState = window._mapglLayerState[mapId];
+        if (!layerState.interactiveFilters) layerState.interactiveFilters = {};
+        if (!layerState.filterStack) layerState.filterStack = {};
     }
 
     // Normalize layerId to array for multi-layer support
@@ -84,19 +86,32 @@ function initializeLegendInteractivity(map, mapId, config) {
         }
     });
 
-    // Determine filter column - use provided or auto-detect from first available layer
+    var filterEnabled = config.filter !== false;
+
+    // Determine filter/color columns - use provided or auto-detect from first available layer
     var filterColumn = config.filterColumn;
-    if (!filterColumn) {
+    var colorColumn = config.colorColumn || filterColumn;
+    if (!filterColumn && (filterEnabled || config.rampPicker)) {
         for (var i = 0; i < layerIds.length; i++) {
             filterColumn = detectFilterColumn(map, layerIds[i]);
             if (filterColumn) break;
         }
     }
+    if (!colorColumn) {
+        colorColumn = filterColumn;
+    }
 
-    if (!filterColumn) {
+    if (filterEnabled && !filterColumn) {
         console.warn(
             "Could not determine filter column for interactive legend. " +
                 "Please provide filter_column parameter."
+        );
+        return;
+    }
+    if (config.rampPicker && !colorColumn) {
+        console.warn(
+            "Could not determine color column for ramp picker. " +
+                "Please provide color_column parameter."
         );
         return;
     }
@@ -112,13 +127,19 @@ function initializeLegendInteractivity(map, mapId, config) {
         values: config.values,
         colors: config.colors,
         filterColumn: filterColumn,
+        colorColumn: colorColumn,
         mapId: mapId
     };
 
-    if (config.type === "categorical") {
+    if (config.type === "categorical" && filterEnabled) {
         initCategoricalLegend(map, mapId, legendElement, filterColumn, config);
     } else if (config.type === "continuous") {
-        initContinuousLegend(map, mapId, legendElement, filterColumn, config);
+        if (filterEnabled) {
+            initContinuousLegend(map, mapId, legendElement, filterColumn, config);
+        }
+        if (config.rampPicker) {
+            initColorRampPicker(map, mapId, legendElement, colorColumn, config);
+        }
     }
 }
 
@@ -211,6 +232,198 @@ function parseExpressionForColumn(expr) {
     return null;
 }
 
+function expressionUsesColumn(expr, column) {
+    return parseExpressionForColumn(expr) === column;
+}
+
+function detectColorPaintProperty(map, layerId, column) {
+    var colorProps = [
+        "fill-color",
+        "circle-color",
+        "line-color",
+        "fill-extrusion-color"
+    ];
+    var fallback = null;
+
+    for (var i = 0; i < colorProps.length; i++) {
+        var prop = colorProps[i];
+        try {
+            var value = map.getPaintProperty(layerId, prop);
+            if (value === undefined || value === null) continue;
+            if (!fallback) fallback = prop;
+            if (Array.isArray(value) && (!column || expressionUsesColumn(value, column))) {
+                return prop;
+            }
+        } catch (e) {
+            // Paint property does not apply to this layer type.
+        }
+    }
+
+    return fallback;
+}
+
+function buildInterpolateExpression(column, values, colors, naColor) {
+    var expr = ["interpolate", ["linear"], ["get", column]];
+    for (var i = 0; i < values.length; i++) {
+        expr.push(Number(values[i]));
+        expr.push(colors[i]);
+    }
+
+    if (naColor) {
+        return ["case", ["==", ["get", column], null], naColor, expr];
+    }
+
+    return expr;
+}
+
+function setPaintPropertyPreservingHover(map, mapId, layerId, propertyName, value) {
+    var currentPaintProperty = null;
+    try {
+        currentPaintProperty = map.getPaintProperty(layerId, propertyName);
+    } catch (e) {
+        return;
+    }
+
+    if (
+        currentPaintProperty &&
+        Array.isArray(currentPaintProperty) &&
+        currentPaintProperty[0] === "case" &&
+        Array.isArray(currentPaintProperty[1]) &&
+        currentPaintProperty[1][0] === "boolean"
+    ) {
+        map.setPaintProperty(layerId, propertyName, [
+            "case",
+            currentPaintProperty[1],
+            currentPaintProperty[2],
+            value
+        ]);
+    } else {
+        map.setPaintProperty(layerId, propertyName, value);
+    }
+
+    var layerState = window._mapglLayerState && window._mapglLayerState[mapId];
+    if (layerState) {
+        if (!layerState.paintProperties[layerId]) {
+            layerState.paintProperties[layerId] = {};
+        }
+        layerState.paintProperties[layerId][propertyName] = value;
+    }
+}
+
+function gradientFromColors(colors) {
+    return "linear-gradient(to right, " + colors.join(", ") + ")";
+}
+
+function initColorRampPicker(map, mapId, legendElement, colorColumn, config) {
+    var picker = legendElement.querySelector(".mapgl-ramp-picker");
+    var gradientBar = legendElement.querySelector(".legend-gradient");
+    if (!picker || !gradientBar || !config.colorRamps) return;
+    if (picker._mapglRampPickerInitialized) return;
+    picker._mapglRampPickerInitialized = true;
+
+    var options = picker.querySelectorAll(".mapgl-ramp-picker-option");
+    var layerIds = config._layerIds;
+    var values = (config.values || []).map(Number);
+    var selectedRamp = config.selectedRamp || Object.keys(config.colorRamps)[0];
+    var colorPropertyByLayer = {};
+
+    layerIds.forEach(function(layerId) {
+        colorPropertyByLayer[layerId] =
+            config.colorProperty || detectColorPaintProperty(map, layerId, colorColumn);
+    });
+
+    function closePicker() {
+        picker.classList.remove("mapgl-ramp-picker-open");
+        gradientBar.setAttribute("aria-expanded", "false");
+    }
+
+    function openPicker() {
+        picker.classList.add("mapgl-ramp-picker-open");
+        gradientBar.setAttribute("aria-expanded", "true");
+    }
+
+    function togglePicker(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (picker.classList.contains("mapgl-ramp-picker-open")) {
+            closePicker();
+        } else {
+            openPicker();
+        }
+    }
+
+    gradientBar.addEventListener("click", togglePicker);
+    gradientBar.addEventListener("keydown", function(e) {
+        if (e.key === "Enter" || e.key === " ") {
+            togglePicker(e);
+        } else if (e.key === "Escape") {
+            closePicker();
+        }
+    });
+
+    document.addEventListener("click", function(e) {
+        if (!picker.contains(e.target) && e.target !== gradientBar) {
+            closePicker();
+        }
+    });
+
+    function applyRamp(rampName) {
+        var colors = config.colorRamps[rampName];
+        if (!colors) return;
+        selectedRamp = rampName;
+
+        var gradient = gradientFromColors(colors);
+        gradientBar.style.background = gradient;
+
+        options.forEach(function(option) {
+            option.setAttribute(
+                "data-selected",
+                String(option.getAttribute("data-ramp-name") === rampName)
+            );
+        });
+
+        layerIds.forEach(function(layerId) {
+            var propertyName = colorPropertyByLayer[layerId];
+            if (!propertyName) {
+                console.warn("No supported color paint property found for layer:", layerId);
+                return;
+            }
+            var expression = buildInterpolateExpression(
+                colorColumn,
+                values,
+                colors,
+                config.naColor || config.na_color
+            );
+            setPaintPropertyPreservingHover(map, mapId, layerId, propertyName, expression);
+        });
+
+        if (typeof HTMLWidgets !== "undefined" && HTMLWidgets.shinyMode) {
+            Shiny.setInputValue(mapId + "_legend_ramp", {
+                legendId: config.legendId,
+                layerId: layerIds.length === 1 ? layerIds[0] : layerIds,
+                column: colorColumn,
+                property: layerIds.length === 1 ? colorPropertyByLayer[layerIds[0]] : colorPropertyByLayer,
+                ramp: rampName,
+                colors: colors,
+                timestamp: Date.now()
+            });
+        }
+    }
+
+    options.forEach(function(option) {
+        option.addEventListener("click", function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            applyRamp(option.getAttribute("data-ramp-name"));
+            closePicker();
+        });
+    });
+
+    if (selectedRamp && config.colorRamps[selectedRamp]) {
+        applyRamp(selectedRamp);
+    }
+}
+
 /**
  * Initialize categorical legend interactivity
  */
@@ -241,28 +454,12 @@ function initCategoricalLegend(map, mapId, legendElement, filterColumn, config) 
         interactiveState.filterColumn = filterColumn;
     });
 
-    // Store original colors for each item
-    var originalColors = {};
-
     // Add click handlers to each item
     items.forEach(function (item, idx) {
         var displayValue = item.getAttribute("data-value") || String(displayValues[idx]);
         item.setAttribute("data-value", displayValue);
         item.setAttribute("data-index", idx);
         item.setAttribute("data-enabled", "true");
-
-        // Store original color - try multiple selectors for different patch types
-        var colorSpan = item.querySelector(".legend-color") ||
-                        item.querySelector(".legend-shape-svg") ||
-                        item.querySelector(".legend-shape-custom");
-        if (colorSpan) {
-            originalColors[idx] = colorSpan.style.backgroundColor ||
-                                  colorSpan.getAttribute("fill") ||
-                                  config.colors[idx];
-        } else {
-            // Fallback to config colors
-            originalColors[idx] = config.colors[idx];
-        }
 
         item.addEventListener("click", function (e) {
             e.preventDefault();
@@ -273,18 +470,13 @@ function initCategoricalLegend(map, mapId, legendElement, filterColumn, config) 
 
             item.setAttribute("data-enabled", String(newState));
 
+            // Disabled opacity/grayscale is handled by the shared CSS. Leave
+            // patch paints untouched: an SVG background colors its rectangular
+            // viewport, not its polygon/path, and corrupts hex/custom patches.
             if (newState) {
                 enabledIndices.add(idx);
-                // Restore original color
-                if (colorSpan) {
-                    colorSpan.style.backgroundColor = originalColors[idx];
-                }
             } else {
                 enabledIndices.delete(idx);
-                // Grey out
-                if (colorSpan) {
-                    colorSpan.style.backgroundColor = "#cccccc";
-                }
             }
 
             // Apply filter to all associated layers
@@ -337,14 +529,8 @@ function initCategoricalLegend(map, mapId, legendElement, filterColumn, config) 
 
     // Add reset button
     addResetButton(legendElement, function () {
-        items.forEach(function (item, i) {
+        items.forEach(function (item) {
             item.setAttribute("data-enabled", "true");
-            var colorSpan = item.querySelector(".legend-color") ||
-                            item.querySelector(".legend-shape-svg") ||
-                            item.querySelector(".legend-shape-custom");
-            if (colorSpan && originalColors[i] !== undefined) {
-                colorSpan.style.backgroundColor = originalColors[i];
-            }
         });
         enabledIndices.clear();
         for (var i = 0; i < numCategories; i++) {
@@ -353,13 +539,21 @@ function initCategoricalLegend(map, mapId, legendElement, filterColumn, config) 
 
         // Reset filter to original for all layers
         layerIds.forEach(function(lid) {
-            var interactiveState = layerState.interactiveFilters[lid];
-            if (interactiveState.originalFilter) {
-                map.setFilter(lid, interactiveState.originalFilter);
+            // Release the legend slot from the filter registry; the composer
+            // restores base/user/slider automatically.
+            layerState.filterStack[lid] = layerState.filterStack[lid] || {};
+            layerState.filterStack[lid].legend = null;
+            if (typeof window._mapglComposeFilter === "function") {
+                window._mapglComposeFilter(map, lid);
             } else {
-                map.setFilter(lid, null);
+                var _is = layerState.interactiveFilters[lid];
+                if (_is && _is.originalFilter) {
+                    map.setFilter(lid, _is.originalFilter);
+                } else {
+                    map.setFilter(lid, null);
+                }
+                layerState.filters[lid] = _is ? _is.originalFilter : null;
             }
-            layerState.filters[lid] = interactiveState.originalFilter;
         });
 
         updateResetButton(legendElement, false);
@@ -568,8 +762,15 @@ function initContinuousLegend(map, mapId, legendElement, filterColumn, config) {
                 interactiveState.rangeMax = maxVal;
 
                 if (isAtFullRange) {
-                    map.setFilter(lid, interactiveState.originalFilter);
-                    layerState.filters[lid] = interactiveState.originalFilter;
+                    // Release the legend slot; composer restores base/user/slider.
+                    layerState.filterStack[lid] = layerState.filterStack[lid] || {};
+                    layerState.filterStack[lid].legend = null;
+                    if (typeof window._mapglComposeFilter === "function") {
+                        window._mapglComposeFilter(map, lid);
+                    } else {
+                        map.setFilter(lid, interactiveState.originalFilter);
+                        layerState.filters[lid] = interactiveState.originalFilter;
+                    }
                 } else {
                     applyRangeFilter(
                         map,
@@ -750,12 +951,19 @@ function initContinuousLegend(map, mapId, legendElement, filterColumn, config) {
             interactiveState.rangeMin = minValue;
             interactiveState.rangeMax = maxValue;
 
-            if (interactiveState.originalFilter) {
-                map.setFilter(lid, interactiveState.originalFilter);
+            // Release the legend slot; composer handles base/user/slider.
+            layerState.filterStack[lid] = layerState.filterStack[lid] || {};
+            layerState.filterStack[lid].legend = null;
+            if (typeof window._mapglComposeFilter === "function") {
+                window._mapglComposeFilter(map, lid);
             } else {
-                map.setFilter(lid, null);
+                if (interactiveState.originalFilter) {
+                    map.setFilter(lid, interactiveState.originalFilter);
+                } else {
+                    map.setFilter(lid, null);
+                }
+                layerState.filters[lid] = interactiveState.originalFilter;
             }
-            layerState.filters[lid] = interactiveState.originalFilter;
         });
 
         updateResetButton(legendElement, false);
@@ -815,11 +1023,17 @@ function applyCategoricalFilter(
         ];
     }
 
-    // Combine with original filter if exists
-    var finalFilter = combineFilters(originalFilter, interactiveFilter);
-
-    map.setFilter(layerId, finalFilter);
-    layerState.filters[layerId] = finalFilter;
+    // Write to the legend slot of the filter registry; the composer
+    // handles merging with base/user/slider slots.
+    layerState.filterStack[layerId] = layerState.filterStack[layerId] || {};
+    layerState.filterStack[layerId].legend = interactiveFilter || null;
+    if (typeof window._mapglComposeFilter === "function") {
+        window._mapglComposeFilter(map, layerId);
+    } else {
+        var finalFilter = combineFilters(originalFilter, interactiveFilter);
+        map.setFilter(layerId, finalFilter);
+        layerState.filters[layerId] = finalFilter;
+    }
 }
 
 /**
@@ -877,11 +1091,16 @@ function applyRangeBasedCategoricalFilter(
         }
     }
 
-    // Combine with original filter if exists
-    var finalFilter = combineFilters(originalFilter, interactiveFilter);
-
-    map.setFilter(layerId, finalFilter);
-    layerState.filters[layerId] = finalFilter;
+    // Write to the legend slot of the filter registry; composer merges.
+    layerState.filterStack[layerId] = layerState.filterStack[layerId] || {};
+    layerState.filterStack[layerId].legend = interactiveFilter || null;
+    if (typeof window._mapglComposeFilter === "function") {
+        window._mapglComposeFilter(map, layerId);
+    } else {
+        var finalFilter = combineFilters(originalFilter, interactiveFilter);
+        map.setFilter(layerId, finalFilter);
+        layerState.filters[layerId] = finalFilter;
+    }
 }
 
 /**
@@ -912,11 +1131,16 @@ function applyRangeFilter(
         ["<=", ["get", column], filterMax]
     ];
 
-    // Combine with original filter if exists
-    var finalFilter = combineFilters(originalFilter, interactiveFilter);
-
-    map.setFilter(layerId, finalFilter);
-    layerState.filters[layerId] = finalFilter;
+    // Write to the legend slot of the filter registry; composer merges.
+    layerState.filterStack[layerId] = layerState.filterStack[layerId] || {};
+    layerState.filterStack[layerId].legend = interactiveFilter || null;
+    if (typeof window._mapglComposeFilter === "function") {
+        window._mapglComposeFilter(map, layerId);
+    } else {
+        var finalFilter = combineFilters(originalFilter, interactiveFilter);
+        map.setFilter(layerId, finalFilter);
+        layerState.filters[layerId] = finalFilter;
+    }
 }
 
 /**
@@ -995,8 +1219,12 @@ function initializeDraggableLegends(container) {
 /**
  * Make a single legend element draggable
  * @param {HTMLElement} legend - The legend element
+ * @param {HTMLElement} [boundsContainer] - Container that constrains the drag.
+ *   Required for legends not nested in a map container (e.g. compare-level
+ *   legends attached to the outer compare element); defaults to the closest
+ *   map container.
  */
-function makeLegendDraggable(legend) {
+function makeLegendDraggable(legend, boundsContainer) {
     var isDragging = false;
     var startX, startY;
     var startLeft, startTop;
@@ -1005,16 +1233,20 @@ function makeLegendDraggable(legend) {
     legend.classList.add('legend-draggable');
 
     // Get the map container (parent of legend)
-    var mapContainer = legend.closest('.mapboxgl-map, .maplibregl-map') || legend.parentElement;
+    var mapContainer = boundsContainer ||
+        legend.closest('.mapboxgl-map, .maplibregl-map') ||
+        legend.parentElement;
 
     function onMouseDown(e) {
         // Don't start drag if clicking on interactive elements (including slider handles)
-        if (e.target.closest('.legend-item, .legend-reset-btn, .continuous-slider-container, .legend-gradient-handle, .legend-gradient-middle, .legend-gradient-overlay-container, input, button')) {
+        if (e.target.closest('.legend-item, .legend-reset-btn, .continuous-slider-container, .legend-gradient, .legend-gradient-handle, .legend-gradient-middle, .legend-gradient-overlay-container, .mapgl-ramp-picker, input, button')) {
             return;
         }
 
         isDragging = true;
         legend.classList.add('legend-dragging');
+        // Once the user moves a legend, automatic stacking leaves it alone
+        legend.dataset.mapglUserMoved = 'true';
 
         startX = e.clientX;
         startY = e.clientY;
@@ -1082,12 +1314,13 @@ function makeLegendDraggable(legend) {
 
         var touch = e.touches[0];
         // Don't start drag if touching interactive elements (including slider handles)
-        if (e.target.closest('.legend-item, .legend-reset-btn, .continuous-slider-container, .legend-gradient-handle, .legend-gradient-middle, .legend-gradient-overlay-container, input, button')) {
+        if (e.target.closest('.legend-item, .legend-reset-btn, .continuous-slider-container, .legend-gradient, .legend-gradient-handle, .legend-gradient-middle, .legend-gradient-overlay-container, .mapgl-ramp-picker, input, button')) {
             return;
         }
 
         isDragging = true;
         legend.classList.add('legend-dragging');
+        legend.dataset.mapglUserMoved = 'true';
 
         startX = touch.clientX;
         startY = touch.clientY;
@@ -1172,5 +1405,288 @@ if (!window._mapglLegendCollapseInstalled) {
             nowCollapsed ? 'Expand legend' : 'Collapse legend'
         );
         btn.textContent = nowCollapsed ? '+' : '\u2013';
+
+        // Collapsing changes the legend's height; ask the owning legend
+        // manager (wrapper's parent) to restack its corner
+        var wrapper = legend.parentElement;
+        var owner = wrapper && wrapper.parentElement;
+        if (owner && owner._mapglLegendManager) {
+            owner._mapglLegendManager.refresh();
+        }
     });
 }
+
+/* ============================================================
+ * Legend manager: zoom-based visibility + automatic stacking
+ *
+ * One manager per container (map container, or the outer compare
+ * element for target = "compare" legends). It holds no per-legend
+ * state: every pass re-queries the DOM, so legends injected later
+ * (Shiny proxy, style-reload restore, compare modifications) are
+ * picked up by the MutationObserver without any call-site plumbing.
+ *
+ * A manager owns exactly the legends whose wrapper div is a direct
+ * child of its container - this keeps the outer compare manager off
+ * the per-side legends owned by each map's own manager.
+ * ============================================================ */
+
+function initializeLegendManager(map, container) {
+    container = container || (map && map.getContainer && map.getContainer());
+    if (!map || !container) return null;
+
+    var existing = container._mapglLegendManager;
+    if (existing) {
+        if (existing.map === map) return existing;
+        // Widget rerender: same container, new map instance
+        existing.dispose();
+    }
+
+    var manager = { map: map, container: container, disposed: false };
+    var rafId = null;
+    var mutationObserver = null;
+    var resizeObserver = null;
+    var observedLegends = [];
+
+    var LEGEND_SELECTOR = '.mapboxgl-legend[id], .maplibregl-legend[id]';
+    var CORNERS = ['top-left', 'top-right', 'bottom-left', 'bottom-right'];
+
+    function isLegendNode(node) {
+        return (
+            node &&
+            node.nodeType === 1 &&
+            node.classList &&
+            (node.classList.contains('mapboxgl-legend') ||
+                node.classList.contains('maplibregl-legend'))
+        );
+    }
+
+    function isOwnedLegend(legend) {
+        return (
+            !!legend &&
+            !!legend.parentElement &&
+            legend.parentElement.parentElement === container
+        );
+    }
+
+    function ownedLegends() {
+        var owned = [];
+        container.querySelectorAll(LEGEND_SELECTOR).forEach(function (legend) {
+            if (isOwnedLegend(legend)) owned.push(legend);
+        });
+        return owned;
+    }
+
+    // Only legend-related mutations schedule work; GL's own DOM churn
+    // (canvas, controls, popups) is ignored
+    function isRelevantRecord(record) {
+        if (record.type === 'childList') {
+            if (record.target === container) {
+                var nodes = Array.prototype.slice
+                    .call(record.addedNodes)
+                    .concat(Array.prototype.slice.call(record.removedNodes));
+                return nodes.some(isLegendNode);
+            }
+            var root =
+                record.target.closest && record.target.closest(LEGEND_SELECTOR);
+            return !!root && isOwnedLegend(root);
+        }
+        if (record.type === 'attributes') {
+            var target = record.target;
+            return (
+                target.matches &&
+                target.matches(LEGEND_SELECTOR) &&
+                isOwnedLegend(target)
+            );
+        }
+        return false;
+    }
+
+    function observe() {
+        mutationObserver.observe(container, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class'],
+        });
+    }
+
+    // Run the manager's own DOM writes without re-triggering the observer;
+    // reconnect synchronously so external changes are never missed
+    function suppress(fn) {
+        if (!mutationObserver) {
+            fn();
+            return;
+        }
+        mutationObserver.disconnect();
+        try {
+            fn();
+        } finally {
+            observe();
+        }
+    }
+
+    function updateZoomVisibility(legends) {
+        var zoom = map.getZoom();
+        var changed = false;
+        legends.forEach(function (legend) {
+            var minZoom = legend.getAttribute('data-min-zoom');
+            var maxZoom = legend.getAttribute('data-max-zoom');
+            if (minZoom === null && maxZoom === null) return;
+            // Same semantics as layer min_zoom/max_zoom: visible when
+            // zoom >= min (inclusive) and zoom < max (exclusive)
+            var visible =
+                (minZoom === null || zoom >= parseFloat(minZoom)) &&
+                (maxZoom === null || zoom < parseFloat(maxZoom));
+            var hidden = legend.classList.contains('mapgl-legend-zoom-hidden');
+            if (visible !== hidden) return;
+            legend.classList.toggle('mapgl-legend-zoom-hidden', !visible);
+            changed = true;
+        });
+        return changed;
+    }
+
+    function repositionLegends(legends) {
+        var containerRect = container.getBoundingClientRect();
+        var groups = {};
+        legends.forEach(function (legend) {
+            if (legend.classList.contains('mapgl-legend-zoom-hidden')) return;
+            if (legend.dataset.manualPosition === 'true') return;
+            if (legend.dataset.mapglUserMoved === 'true') return;
+            if (window.getComputedStyle(legend).display === 'none') return;
+            for (var i = 0; i < CORNERS.length; i++) {
+                if (legend.classList.contains(CORNERS[i])) {
+                    (groups[CORNERS[i]] = groups[CORNERS[i]] || []).push(legend);
+                    break;
+                }
+            }
+        });
+        Object.keys(groups).forEach(function (corner) {
+            var stack = groups[corner];
+            var isTop = corner.indexOf('top') === 0;
+            var prevRect = null;
+            stack.forEach(function (legend, i) {
+                if (i === 0) {
+                    // First legend keeps its CSS corner position
+                    legend.style.top = '';
+                    legend.style.bottom = '';
+                } else if (isTop) {
+                    // Stack downward: the element's own margin provides the gap
+                    legend.style.bottom = '';
+                    legend.style.top =
+                        prevRect.bottom - containerRect.top + 'px';
+                } else {
+                    // Stack upward from the bottom edge
+                    legend.style.top = '';
+                    legend.style.bottom =
+                        containerRect.bottom - prevRect.top + 'px';
+                }
+                prevRect = legend.getBoundingClientRect();
+            });
+        });
+    }
+
+    function refresh() {
+        rafId = null;
+        if (manager.disposed) return;
+        var legends = ownedLegends();
+
+        // Owned draggable legends get drag behavior bounded by this
+        // container (covers proxy-added, restored, and compare legends)
+        legends.forEach(function (legend) {
+            if (
+                legend.getAttribute('data-draggable') === 'true' &&
+                !legend._draggableInitialized
+            ) {
+                legend._draggableInitialized = true;
+                makeLegendDraggable(legend, container);
+            }
+        });
+
+        // Reconcile the ResizeObserver's observed set
+        if (resizeObserver) {
+            observedLegends = observedLegends.filter(function (legend) {
+                if (legends.indexOf(legend) === -1) {
+                    resizeObserver.unobserve(legend);
+                    return false;
+                }
+                return true;
+            });
+            legends.forEach(function (legend) {
+                if (observedLegends.indexOf(legend) === -1) {
+                    resizeObserver.observe(legend);
+                    observedLegends.push(legend);
+                }
+            });
+        }
+
+        suppress(function () {
+            updateZoomVisibility(legends);
+            repositionLegends(legends);
+        });
+    }
+
+    function scheduleRefresh() {
+        if (rafId !== null || manager.disposed) return;
+        rafId = requestAnimationFrame(refresh);
+    }
+
+    function onZoom() {
+        if (manager.disposed) return;
+        // Cheap class pass on every zoom frame; full relayout only when
+        // some legend's hidden state actually changed
+        var changed = false;
+        suppress(function () {
+            changed = updateZoomVisibility(ownedLegends());
+        });
+        if (changed) scheduleRefresh();
+    }
+
+    manager.refresh = scheduleRefresh;
+    manager.dispose = function () {
+        if (manager.disposed) return;
+        manager.disposed = true;
+        if (rafId !== null) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
+        if (mutationObserver) mutationObserver.disconnect();
+        if (resizeObserver) resizeObserver.disconnect();
+        observedLegends = [];
+        if (map.off) {
+            map.off('zoom', onZoom);
+            map.off('remove', manager.dispose);
+        }
+        if (container._mapglLegendManager === manager) {
+            delete container._mapglLegendManager;
+        }
+    };
+
+    if (typeof MutationObserver !== 'undefined') {
+        mutationObserver = new MutationObserver(function (records) {
+            if (manager.disposed) return;
+            for (var i = 0; i < records.length; i++) {
+                if (isRelevantRecord(records[i])) {
+                    scheduleRefresh();
+                    return;
+                }
+            }
+        });
+        observe();
+    }
+    if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(function () {
+            if (!manager.disposed) scheduleRefresh();
+        });
+    }
+
+    map.on('zoom', onZoom);
+    // Dispose as soon as the map goes away (widget rerender) so stale
+    // observers don't linger until the replacement map initializes
+    if (map.once) map.once('remove', manager.dispose);
+
+    container._mapglLegendManager = manager;
+    refresh();
+    return manager;
+}
+
+window.initializeLegendManager = initializeLegendManager;

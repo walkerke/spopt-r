@@ -49,7 +49,9 @@ lscp(
 
 A list with two sf objects:
 
-- `$demand`: Original demand sf with `.covered` column (logical)
+- `$demand`: Original demand sf with `.covered` column (logical),
+  `.facility` (nearest selected facility), and `.cost` (cost to that
+  facility, from the original cost matrix; `NA` if uncovered)
 
 - `$facilities`: Original facilities sf with `.selected` column
   (logical)
@@ -119,14 +121,14 @@ result$facilities[result$facilities$.selected, ]
 #> Simple feature collection with 6 features and 2 fields
 #> Geometry type: POINT
 #> Dimension:     XY
-#> Bounding box:  xmin: 0.07664672 ymin: 0.03393387 xmax: 0.9433377 ymax: 0.8543107
+#> Bounding box:  xmin: 0.04811234 ymin: 0.2235654 xmax: 0.9033195 ymax: 0.9433377
 #> CRS:           NA
-#>                         geometry .selected .n_assigned
-#> 1     POINT (0.871377 0.6559909)      TRUE          10
-#> 3  POINT (0.07664672 0.03393387)      TRUE           8
-#> 5    POINT (0.9433377 0.5206516)      TRUE           4
-#> 7    POINT (0.3706833 0.3162807)      TRUE           9
-#> 9     POINT (0.138154 0.8543107)      TRUE           9
-#> 10   POINT (0.6074349 0.1576129)      TRUE           7
+#>                        geometry .selected .n_assigned
+#> 1   POINT (0.6124158 0.2804039)      TRUE          12
+#> 3   POINT (0.7246128 0.5457883)      TRUE           5
+#> 6    POINT (0.2448466 0.871377)      TRUE           6
+#> 7   POINT (0.9033195 0.2235654)      TRUE           5
+#> 9  POINT (0.04811234 0.3990994)      TRUE           9
+#> 10  POINT (0.6471519 0.9433377)      TRUE           8
 # }
 ```

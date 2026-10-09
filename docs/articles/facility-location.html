@@ -37,7 +37,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">spopt</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.3</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -241,7 +241,7 @@
 <span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/summarise.html" class="external-link">summarize</a></span><span class="op">(</span></span>
 <span>    tracts <span class="op">=</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/context.html" class="external-link">n</a></span><span class="op">(</span><span class="op">)</span>,</span>
 <span>    population <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">weight</span><span class="op">)</span>,</span>
-<span>    mean_km <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/weighted.mean.html" class="external-link">weighted.mean</a></span><span class="op">(</span><span class="va">cost</span>, <span class="va">weight</span><span class="op">)</span> <span class="op">/</span> <span class="fl">1000</span></span>
+<span>    mean_km <span class="op">=</span> <span class="fu"><a href="https://rspatial.github.io/terra/reference/weighted.mean.html" class="external-link">weighted.mean</a></span><span class="op">(</span><span class="va">cost</span>, <span class="va">weight</span><span class="op">)</span> <span class="op">/</span> <span class="fl">1000</span></span>
 <span>  <span class="op">)</span></span></code></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 5 × 4
@@ -288,7 +288,7 @@ $fixed_facilities
 NULL
 
 $solve_time
-[1] 0.4912882</code></pre>
+[1] 0.514914</code></pre>
 </div>
 </div>
 <p>The <code>objective</code> value represents the total weighted distance - lower is better.</p>
@@ -511,7 +511,7 @@ $solve_time
 <code class="sourceCode R"><span><span class="co"># How many demand points are split?</span></span>
 <span><span class="va">n_split</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum</a></span><span class="op">(</span><span class="va">result_cflp</span><span class="op">$</span><span class="va">demand</span><span class="op">$</span><span class="va">.split</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/cat.html" class="external-link">cat</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sprintf.html" class="external-link">sprintf</a></span><span class="op">(</span><span class="st">"%d of %d demand points are served by multiple facilities"</span>,</span>
-<span>            <span class="va">n_split</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">demand_pts</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span>            <span class="va">n_split</span>, <span class="fu"><a href="https://rspatial.github.io/terra/reference/dimensions.html" class="external-link">nrow</a></span><span class="op">(</span><span class="va">demand_pts</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>2 of 448 demand points are served by multiple facilities</code></pre>
 </div>
@@ -520,7 +520,7 @@ $solve_time
 <div class="cell">
 <div class="sourceCode cell-code" id="cb20"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">cflp_lines</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/spider_lines.html">spider_lines</a></span><span class="op">(</span><span class="va">result_cflp</span>, allocations <span class="op">=</span> <span class="st">"all"</span><span class="op">)</span> <span class="op">|&gt;</span></span>
-<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>split <span class="op">=</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/if_else.html" class="external-link">if_else</a></span><span class="op">(</span><span class="va">demand_index</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">result_cflp</span><span class="op">$</span><span class="va">demand</span><span class="op">$</span><span class="va">.split</span><span class="op">)</span>,</span>
+<span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/mutate.html" class="external-link">mutate</a></span><span class="op">(</span>split <span class="op">=</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/if_else.html" class="external-link">if_else</a></span><span class="op">(</span><span class="va">demand_index</span> <span class="op"><a href="https://rspatial.github.io/terra/reference/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="va">result_cflp</span><span class="op">$</span><span class="va">demand</span><span class="op">$</span><span class="va">.split</span><span class="op">)</span>,</span>
 <span>                         <span class="st">"split"</span>, <span class="st">"single"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://walker-data.com/mapgl/reference/maplibre.html" class="external-link">maplibre</a></span><span class="op">(</span>bounds <span class="op">=</span> <span class="va">tarrant</span><span class="op">)</span> <span class="op">|&gt;</span></span>

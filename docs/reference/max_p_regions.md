@@ -238,7 +238,7 @@ Transactions in GIS, 26, 717-734.
 library(sf)
 nc <- st_read(system.file("shape/nc.shp", package = "sf"))
 #> Reading layer `nc' from data source 
-#>   `/Users/kylewalker/Library/R/arm64/4.5/library/sf/shape/nc.shp' 
+#>   `/Library/Frameworks/R.framework/Versions/4.6/Resources/library/sf/shape/nc.shp' 
 #>   using driver `ESRI Shapefile'
 #> Simple feature collection with 100 features and 14 fields
 #> Geometry type: MULTIPOLYGON
@@ -270,7 +270,7 @@ result_compact <- max_p_regions(
 
 # Check compactness
 attr(result_compact, "spopt")$mean_compactness
-#> [1] 0.1982033
+#> [1] 0.2027611
 
 # Plot results
 plot(result[".region"])

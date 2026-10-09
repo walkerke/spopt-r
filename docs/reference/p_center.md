@@ -62,7 +62,9 @@ p_center(
 
 A list with two sf objects:
 
-- `$demand`: Original demand sf with `.facility` column
+- `$demand`: Original demand sf with `.facility` column and `.cost`
+  column (cost to the assigned facility, from the original cost matrix;
+  `NA` if unassigned)
 
 - `$facilities`: Original facilities sf with `.selected` column
 
@@ -140,6 +142,6 @@ result <- p_center(demand, facilities, n_facilities = 4)
 
 # Maximum distance any demand point must travel
 attr(result, "spopt")$max_distance
-#> [1] 0.3861541
+#> [1] 0.3515138
 # }
 ```

@@ -48,6 +48,7 @@ r5r requires Java 21 and OpenStreetMap data. Here’s the workflow used to
 generate a travel-time matrix for Tarrant County, Texas:
 
 ``` r
+
 # Install r5r and set up Java
 install.packages("r5r")
 install.packages("rJavaEnv")
@@ -137,6 +138,7 @@ we’ll use for the examples below. This data was generated using the
 workflow above.
 
 ``` r
+
 library(spopt)
 library(sf)
 library(tidyverse)
@@ -166,6 +168,7 @@ Let’s compare P-Median solutions using Euclidean distance versus actual
 travel times:
 
 ``` r
+
 # Solution using travel-time matrix
 result_tt <- p_median(
  demand = demand,
@@ -221,6 +224,7 @@ The two methods select quite different facility locations. Let’s
 visualize the comparison:
 
 ``` r
+
 # Filter to only selected facilities
 selected_facilities <- candidates_compared |>
  filter(category != "Not selected")
@@ -258,6 +262,7 @@ they’re farther in straight-line distance. Let’s examine the objective
 values:
 
 ``` r
+
 # Compare objective values
 tt_obj <- attr(result_tt, "spopt")$objective
 euc_obj <- attr(result_euc, "spopt")$objective
@@ -268,6 +273,7 @@ cat("Travel-time solution objective:", round(tt_obj, 0), "person-minutes\n")
     Travel-time solution objective: 29305339 person-minutes
 
 ``` r
+
 cat("Euclidean solution objective:", round(euc_obj, 0), "person-meters\n")
 ```
 
@@ -283,6 +289,7 @@ We can also visualize how demand points are assigned to facilities under
 each solution:
 
 ``` r
+
 # Get demand assignments from travel-time solution
 demand_tt <- result_tt$demand |>
  mutate(facility_id = as.character(.facility))
@@ -327,6 +334,88 @@ maplibre(bounds = tracts) |>
 Each demand point is colored by its assigned facility. Notice how the
 service areas follow the road network structure rather than forming
 simple circular regions; look in particular along major highways.
+
+### Spider lines with travel times
+
+[`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md)
+draws a line from each demand point to its assigned facility. When the
+solver used a travel-time matrix, each demand point’s `.cost` column
+holds the drive time to its assigned facility.
+[`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md)
+picks this up automatically as a `cost` column, so the lines can be
+styled by drive time:
+
+``` r
+
+tt_lines <- spider_lines(result_tt)
+
+summary(tt_lines$cost)
+```
+
+       Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
+       2.00   10.00   13.00   13.62   17.00   36.00 
+
+``` r
+
+maplibre(bounds = tracts) |>
+  add_fill_layer(
+    id = "tracts",
+    source = tracts,
+    fill_color = "lightgray",
+    fill_opacity = 0.2
+  ) |>
+  add_line_layer(
+    id = "allocations",
+    source = tt_lines,
+    line_color = interpolate(
+      column = "cost",
+      values = c(5, 15, 30),
+      stops = c("#fee08b", "#f46d43", "#a50026")
+    ),
+    line_width = 1.5
+  ) |>
+  add_circle_layer(
+    id = "facilities",
+    source = facilities_tt,
+    circle_radius = 10,
+    circle_color = "black",
+    circle_stroke_color = "white",
+    circle_stroke_width = 2
+  ) |>
+  add_legend(
+    "Drive time (minutes)",
+    values = c(5, 15, 30),
+    colors = c("#fee08b", "#f46d43", "#a50026")
+  )
+```
+
+The lines are straight, but their color reflects drive time over the
+road network, so the longest trips stand out.
+
+To draw lines that follow the roads themselves, pass a routing function
+to the `route_fun` argument of
+[`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md).
+[`r5r_route_fun()`](https://walker-data.com/spopt-r/reference/r5r_route_fun.md)
+builds one from the same r5r network used to compute the travel-time
+matrix above:
+
+``` r
+
+routed_lines <- spider_lines(
+  result_tt,
+  route_fun = r5r_route_fun(
+    r5r_core,
+    mode = "CAR",
+    departure_datetime = as.POSIXct("2026-10-07 08:00:00")
+  )
+)
+```
+
+Each spider line then traces the driving route between a tract and its
+assigned facility. r5r routes every pair in one batched call. Any pair
+it can’t route falls back to a straight line, flagged by
+`routed == FALSE`. For other routers such as OSRM, see the example in
+[`?spider_lines`](https://walker-data.com/spopt-r/reference/spider_lines.md).
 
 ## Best practices
 

@@ -11,12 +11,14 @@ solver for facility location.
 Install the official release from CRAN:
 
 ``` r
+
 install.packages("spopt")
 ```
 
 Or, install the development version from r-universe:
 
 ``` r
+
 install.packages('spopt', repos = c('https://walkerke.r-universe.dev', 'https://cloud.r-project.org'))
 ```
 

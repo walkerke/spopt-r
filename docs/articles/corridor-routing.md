@@ -68,6 +68,7 @@ derived from a USGS digital elevation model, and land cover from the
 National Land Cover Database (NLCD).
 
 ``` r
+
 library(spopt)
 library(terra)
 library(sf)
@@ -76,6 +77,7 @@ library(mapgl)
 ```
 
 ``` r
+
 dem  <- rast("/vsicurl/https://walker-data.com/maps/data/wv_dem.tif")
 nlcd <- rast("/vsicurl/https://walker-data.com/maps/data/wv_nlcd.tif")
 
@@ -83,6 +85,7 @@ map_bounds  <- c(-81.25, 39.05, -80.65, 39.45)
 ```
 
 ``` r
+
 maplibre(
   style = openfreemap_style("positron"),
   bounds = map_bounds
@@ -120,6 +123,7 @@ then assign a base friction of 1.0 for flat ground, increasing by 0.3
 per degree of slope.
 
 ``` r
+
 slope <- terrain(dem, v = "slope", unit = "degrees")
 
 friction <- 1.0 + slope * 0.3
@@ -133,6 +137,7 @@ negotiations. Water bodies and wetlands are treated as impassable due to
 permitting constraints under Section 404 of the Clean Water Act.
 
 ``` r
+
 # Land cover weight table
 #
 # NLCD Class              Multiplier  Rationale
@@ -188,6 +193,7 @@ County (API: 4708510142). Coordinates were taken from the latitude and
 longitude fields in the well database.
 
 ``` r
+
 farley_ll  <- c(-80.832905, 39.178088)
 swd_ll     <- c(-81.096363, 39.256618)
 
@@ -204,6 +210,7 @@ swd <- to_utm(swd_ll)
 ```
 
 ``` r
+
 # Mapping helpers (reused across sections)
 sites <- tibble(
   label = c("Farley Unit", "Ritchie Hunter SWD"),
@@ -221,6 +228,7 @@ With the cost surface and endpoints defined,
 finds the path that minimizes total accumulated friction.
 
 ``` r
+
 path <- route_corridor(cost_surface, farley, swd)
 path
 ```
@@ -231,7 +239,7 @@ path
       Path distance: 31230
       Cells traversed: 883
       Sinuosity: 1.282
-      Solve time: 0.328 s
+      Solve time: 0.251 s
 
 The returned object is an sf LINESTRING with several useful columns.
 `total_cost` is the accumulated friction along the path, a relative
@@ -242,6 +250,7 @@ straight route, and values above 1.0 indicate how much the path deviates
 to find easier terrain.
 
 ``` r
+
 maplibre(style = openfreemap_style("positron"), bounds = map_bounds) |>
   add_image_source(id = "cost", data = cost_surface, colors = cost_colors) |>
   add_raster_layer(
@@ -292,6 +301,7 @@ crossings, and different stretches of terrain. See
 for references and methodological details.
 
 ``` r
+
 alternatives <- route_k_corridors(
   cost_surface, farley, swd,
   k = 5,
@@ -304,7 +314,7 @@ alternatives
     k-Diverse Corridor Routing (spopt)
       Corridors found: 5 of 5 requested
       Penalty: 2.0x within 1217.8 of each prior path
-      Routing time: 2.216s (solve: 1.862s, graph build: 0.354s)
+      Routing time: 1.580s (solve: 1.392s, graph build: 0.189s)
 
                              Cost    Distance  Sinuosity     Spacing  Overlap
       Optimal             101,740       31230      1.282           -        -
@@ -324,6 +334,7 @@ cost; later alternatives sometimes discover cheaper corridors through
 terrain that earlier iterations didn’t explore.
 
 ``` r
+
 alt_colors <- c("#dc2626", "#f97316", "#eab308", "#22c55e", "#3b82f6")
 
 alternatives_4326 <- alternatives |>
@@ -379,6 +390,7 @@ pre-builds the graph once so that all three pads can be routed
 efficiently.
 
 ``` r
+
 # Three Antero pad sites spread across Doddridge County
 pads <- tribble(
   ~pad_name,  ~lon,        ~lat,
@@ -392,6 +404,7 @@ pads_utm <- pads |>
 ```
 
 ``` r
+
 g <- corridor_graph(cost_surface, neighbours = 8L)
 g
 ```
@@ -400,13 +413,14 @@ g
       Grid: 1502 x 1463 (2,197,426 cells)
       Cell size: 29.6 x 29.6
       Neighbours: 8 (17,473,816 edges)
-      Build time: 0.069s | Graph storage: ~297.2 MB
+      Build time: 0.033s | Graph storage: ~297.2 MB
 
 The graph object is a snapshot of the cost surface at build time. Once
 built, any number of origin-destination pairs can be routed on it
 without reprocessing the raster.
 
 ``` r
+
 pad_colors <- c("#2563eb", "#16a34a", "#f97316")
 
 pad_paths <- pads_utm |>
@@ -434,6 +448,7 @@ pads_sf <- pads |>
 ```
 
 ``` r
+
 swd_pt <- sites |> filter(type == "disposal")
 
 maplibre(style = openfreemap_style("positron"), bounds = map_bounds) |>
@@ -482,6 +497,7 @@ stored in the corridor’s metadata make it possible to extract terrain
 and land cover attributes for every cell along the path.
 
 ``` r
+
 meta <- attr(path, "spopt")
 
 path_profile <- tibble(
@@ -496,6 +512,7 @@ cat(sprintf("Corridor: Farley Unit -> Ritchie Hunter SWD\n"))
     Corridor: Farley Unit -> Ritchie Hunter SWD
 
 ``` r
+
 cat(sprintf("  Length: %.1f km (straight-line: %.1f km)\n",
     path$path_dist / 1000, path$straight_line_dist / 1000))
 ```
@@ -503,12 +520,14 @@ cat(sprintf("  Length: %.1f km (straight-line: %.1f km)\n",
       Length: 31.2 km (straight-line: 24.4 km)
 
 ``` r
+
 cat(sprintf("  Sinuosity: %.3f\n", path$sinuosity))
 ```
 
       Sinuosity: 1.282
 
 ``` r
+
 cat(sprintf("  Elevation: %d - %d m\n",
     min(path_profile$elevation_m), max(path_profile$elevation_m)))
 ```
@@ -516,6 +535,7 @@ cat(sprintf("  Elevation: %d - %d m\n",
       Elevation: 216 - 335 m
 
 ``` r
+
 cat(sprintf("  Slope: mean %.1f deg, max %.1f deg\n",
     mean(path_profile$slope_deg), max(path_profile$slope_deg)))
 ```
@@ -528,6 +548,7 @@ restoration. Developed areas require right-of-way negotiation with
 landowners. Pastureland is generally the simplest and cheapest to cross.
 
 ``` r
+
 lc_labels <- tribble(
   ~nlcd_class, ~label,
   "21", "Developed, open space",

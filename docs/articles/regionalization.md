@@ -34,6 +34,7 @@ median household income, and percentage with a bachelor’s degree -
 variables that might define meaningful neighborhood clusters.
 
 ``` r
+
 library(spopt)
 library(tidycensus)
 library(tidyverse)
@@ -61,6 +62,7 @@ data. Let’s take a quick look at the geographic distribution of median
 household income:
 
 ``` r
+
 maplibre_view(dallas, column = "incomeE")
 ```
 
@@ -70,18 +72,18 @@ downtown, with lower incomes in the southern part of the county.
 
 ## Max-P regionalization
 
-The *Max-P* algorithm ([Duque, Anselin, and Rey 2012](#ref-duque2012))
-finds the maximum number of regions such that each region exceeds a
-specified threshold while minimizing within-region heterogeneity. This
-is particularly useful when you need regions that meet minimum
-population requirements for statistical reliability. Recent extensions
-support compactness constraints ([Feng, Rey, and Wei
-2022](#ref-feng2022)) and improved efficiency ([Wei, Rey, and Knaap
-2021](#ref-wei2021)).
+The *Max-P* algorithm ([Duque et al. 2012](#ref-duque2012)) finds the
+maximum number of regions such that each region exceeds a specified
+threshold while minimizing within-region heterogeneity. This is
+particularly useful when you need regions that meet minimum population
+requirements for statistical reliability. Recent extensions support
+compactness constraints ([Feng et al. 2022](#ref-feng2022)) and improved
+efficiency ([Wei et al. 2021](#ref-wei2021)).
 
 Let’s create regions where each must contain at least 50,000 people:
 
 ``` r
+
 maxp_result <- max_p_regions(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -107,13 +109,14 @@ Let’s step through the key parameters:
   elements.
 
 The result is an sf object with a new `.region` column indicating each
-tract’s assigned region. The algorithm found 41 regions, each with at
+tract’s assigned region. The algorithm found 42 regions, each with at
 least 50,000 residents.
 
 You can access metadata about the solution through the `spopt`
 attribute:
 
 ``` r
+
 attr(maxp_result, "spopt")
 ```
 
@@ -121,10 +124,10 @@ attr(maxp_result, "spopt")
     [1] "max_p"
 
     $n_regions
-    [1] 41
+    [1] 42
 
     $objective
-    [1] 590.8766
+    [1] 721.8724
 
     $threshold_var
     [1] "popE"
@@ -134,50 +137,51 @@ attr(maxp_result, "spopt")
 
     $region_stats
        region n_areas threshold_sum meets_threshold
-    1      32      21         72029            TRUE
-    2       3      15         53946            TRUE
-    3      23      21         63065            TRUE
-    4      30      17         62150            TRUE
-    5      24      26         71536            TRUE
-    6      37      21         83805            TRUE
-    7      38      18         50354            TRUE
-    8      29      15         66966            TRUE
-    9      35      15         56258            TRUE
-    10     16      11         53648            TRUE
-    11      1      14         56269            TRUE
-    12      8      18         52794            TRUE
-    13     28      15         55143            TRUE
-    14     22      15         57214            TRUE
-    15     19      13         54953            TRUE
-    16      9      13         57807            TRUE
-    17     27      13         59039            TRUE
-    18     12      15         76933            TRUE
-    19      2      12         75397            TRUE
-    20      7      14         56740            TRUE
-    21      6      16         61365            TRUE
-    22     20      12         55996            TRUE
-    23     39      15         54040            TRUE
-    24     25      13         56181            TRUE
-    25     36      15         66457            TRUE
-    26     21      12         59392            TRUE
-    27     40      16         59179            TRUE
-    28     31      24        102478            TRUE
-    29     34      19         61859            TRUE
-    30     17      19         61110            TRUE
-    31     14      18         71146            TRUE
-    32     26      13         56329            TRUE
-    33     10      14         62108            TRUE
-    34     15      14         54934            TRUE
-    35      4      13         71990            TRUE
-    36      5      18         75197            TRUE
-    37     13      14         70617            TRUE
-    38     41      12         64772            TRUE
-    39     11      12         54340            TRUE
-    40     33      18         78145            TRUE
-    41     18      13         65175            TRUE
+    1      34      19         55067            TRUE
+    2      22      20         55756            TRUE
+    3      13      20         57532            TRUE
+    4      15      18         58572            TRUE
+    5      11      17         70300            TRUE
+    6      19      16         53104            TRUE
+    7      30      15         57564            TRUE
+    8      32      14         70987            TRUE
+    9       2      13         57136            TRUE
+    10      7      13         56799            TRUE
+    11      4      19         84803            TRUE
+    12     28      20         80694            TRUE
+    13     10      16         66503            TRUE
+    14     40      17         51836            TRUE
+    15     14      19         59935            TRUE
+    16     31      15         50408            TRUE
+    17     16      20         77562            TRUE
+    18     12      12         53282            TRUE
+    19     37      12         58518            TRUE
+    20      3      14         76137            TRUE
+    21     23      18         66105            TRUE
+    22     29      12         53000            TRUE
+    23     38      15         72698            TRUE
+    24      8      11         53509            TRUE
+    25     24      15         58285            TRUE
+    26     20      13         51909            TRUE
+    27     21      13         56519            TRUE
+    28     26      16         62346            TRUE
+    29      5      19         61238            TRUE
+    30     17      18         68974            TRUE
+    31     41      17         68787            TRUE
+    32     25      14         57793            TRUE
+    33      6      13         56919            TRUE
+    34     18      16         75859            TRUE
+    35      9      14         71454            TRUE
+    36      1      12         54077            TRUE
+    37     35      12         51670            TRUE
+    38     39      12         60798            TRUE
+    39     33      16         75833            TRUE
+    40     42      13         58911            TRUE
+    41     36      10         52973            TRUE
+    42     27      14         56704            TRUE
 
     $solve_time
-    [1] 0.07079196
+    [1] 0.03757095
 
     $scaled
     [1] TRUE
@@ -211,6 +215,7 @@ corners). You can also use **rook contiguity**, where tracts must share
 an edge to be neighbors:
 
 ``` r
+
 maxp_rook <- max_p_regions(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -240,6 +245,7 @@ want regions with compact, regular shapes. The `compact` parameter
 optimizes for compactness in addition to attribute homogeneity:
 
 ``` r
+
 maxp_compact <- max_p_regions(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -261,9 +267,8 @@ prioritize compact shapes. The parameter `compact_metric` provides a
 choice between two compactness metrics. The default, “centroid
 dispersion”, is appropriate for both polygons (e.g., state borders) and
 point geometries (e.g., store locations). The alternative option, “NMI”
-(normalized moment of inertia), is the original metric proposed by Feng,
-Rey, and Wei ([2022](#ref-feng2022)), and is appropriate only for
-polygons.
+(normalized moment of inertia), is the original metric proposed by Feng
+et al. ([2022](#ref-feng2022)), and is appropriate only for polygons.
 
 ## SKATER algorithm
 
@@ -274,6 +279,7 @@ attribute similarity, then iteratively removes edges to create clusters.
 The algorithm is fast and produces spatially coherent regions.
 
 ``` r
+
 skater_result <- skater(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -288,6 +294,7 @@ SKATER supports a `floor` and `floor_value` parameter if you need
 minimum population constraints:
 
 ``` r
+
 skater_constrained <- skater(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -306,6 +313,7 @@ uses local search optimization with three algorithm variants: basic
 (greedy), tabu search, and simulated annealing.
 
 ``` r
+
 azp_result <- azp(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -331,6 +339,7 @@ For large problems, you may also want to use the simulated annealing
 variant:
 
 ``` r
+
 azp_sa <- azp(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -351,6 +360,7 @@ the spectral embedding. This approach can find clusters with complex,
 non-convex shapes that other methods might miss.
 
 ``` r
+
 spenc_result <- spenc(
   dallas,
   attrs = c("incomeE", "bachelorsE"),
@@ -373,6 +383,7 @@ of adjacent clusters that minimizes the increase in total within-cluster
 variance.
 
 ``` r
+
 ward_result <- ward_spatial(
   dallas,
   attrs = c("incomeE", "bachelorsE"),

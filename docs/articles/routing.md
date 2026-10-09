@@ -30,6 +30,7 @@ Worth dispatching drivers to 25 residential addresses across Fort Worth,
 Benbrook, and Aledo.
 
 ``` r
+
 library(spopt)
 library(tidyverse)
 library(sf)
@@ -69,6 +70,7 @@ travel-time matrix in minutes computed with r5r from an OpenStreetMap
 road network.
 
 ``` r
+
 # Depot is the first row
 depot <- stops |> filter(id == "depot")
 deliveries <- stops |> filter(id != "depot")
@@ -108,6 +110,7 @@ every stop to every other stop - rather than the rectangular
 demand-to-facility matrix used in facility location.
 
 ``` r
+
 # How the matrix was generated (requires Java 21 + OSM data)
 library(r5r)
 options(java.parameters = "-Xmx4G")
@@ -153,6 +156,7 @@ The simplest case: one driver, all 25 stops, return to the depot. The
 function finds the shortest sequence.
 
 ``` r
+
 result <- route_tsp(stops, start = 1, cost_matrix = ttm)
 
 meta <- attr(result, "spopt")
@@ -162,12 +166,14 @@ cat(sprintf("Optimized route: %.0f minutes\n", meta$total_cost))
     Optimized route: 135 minutes
 
 ``` r
+
 cat(sprintf("Nearest-neighbor baseline: %.0f minutes\n", meta$nn_cost))
 ```
 
     Nearest-neighbor baseline: 150 minutes
 
 ``` r
+
 cat(sprintf("Improvement: %.1f%%\n", meta$improvement_pct))
 ```
 
@@ -182,6 +188,7 @@ remaining inefficiency.
 Let’s look at the visit order:
 
 ``` r
+
 result |>
   st_drop_geometry() |>
   filter(.visit_order <= 10) |>
@@ -209,6 +216,7 @@ together rather than bouncing back and forth. As the bundled
 draw the actual driving paths:
 
 ``` r
+
 tsp_route <- delivery_data$tsp_route
 
 # Number stops by visit order
@@ -264,6 +272,7 @@ at the office and end at their last appointment. Set `end = NULL` for an
 open route:
 
 ``` r
+
 result_open <- route_tsp(stops, start = 1, end = NULL, cost_matrix = ttm)
 meta_open <- attr(result_open, "spopt")
 
@@ -273,12 +282,14 @@ cat(sprintf("Closed route: %.0f minutes\n", meta$total_cost))
     Closed route: 135 minutes
 
 ``` r
+
 cat(sprintf("Open route:   %.0f minutes\n", meta_open$total_cost))
 ```
 
     Open route:   120 minutes
 
 ``` r
+
 cat(sprintf("Saved by not returning: %.0f minutes\n",
             meta$total_cost - meta_open$total_cost))
 ```
@@ -295,6 +306,7 @@ from a warehouse and must end at a specific drop-off location. Use
 `start` and `end` to fix both endpoints:
 
 ``` r
+
 # Start at depot (1), end at the farthest delivery (index of a Parker County stop)
 parker_stop <- which(grepl("Willow Park|Hudson Oaks|Aledo", stops$address))[1]
 
@@ -307,6 +319,7 @@ cat(sprintf("Route type: %s\n", meta_path$route_type))
     Route type: path
 
 ``` r
+
 cat(sprintf("Total time: %.0f minutes\n", meta_path$total_cost))
 ```
 
@@ -325,24 +338,28 @@ Our stops have package counts ranging from 3 to 5. With a van capacity
 of 35 packages:
 
 ``` r
+
 cat(sprintf("Total packages: %d\n", sum(stops$packages)))
 ```
 
     Total packages: 98
 
 ``` r
+
 cat(sprintf("Van capacity: 35\n"))
 ```
 
     Van capacity: 35
 
 ``` r
+
 cat(sprintf("Minimum vans needed: %d\n", ceiling(sum(stops$packages) / 35)))
 ```
 
     Minimum vans needed: 3
 
 ``` r
+
 result_vrp <- route_vrp(
   stops,
   depot = 1,
@@ -358,6 +375,7 @@ cat(sprintf("Vehicles used: %d\n", meta_vrp$n_vehicles))
     Vehicles used: 3
 
 ``` r
+
 cat(sprintf("Total drive time: %.0f minutes\n", meta_vrp$total_cost))
 ```
 
@@ -369,6 +387,7 @@ construction, then improves with intra-route 2-opt and or-opt
 (moving stops between vehicles).
 
 ``` r
+
 summary(result_vrp)
 ```
 
@@ -389,6 +408,7 @@ The bundled data includes road geometries for each vehicle’s route.
 Let’s see how the fleet covers the delivery area:
 
 ``` r
+
 vrp_route <- delivery_data$vrp_route |>
   mutate(vehicle = as.character(vehicle))
 
@@ -446,6 +466,7 @@ stops and the red driver the northern stops.
 If you have exactly 2 vans available, set `n_vehicles`:
 
 ``` r
+
 result_2vans <- route_vrp(
   stops,
   depot = 1,
@@ -462,6 +483,7 @@ cat(sprintf("Vehicles: %d\n", meta_2$n_vehicles))
     Vehicles: 2
 
 ``` r
+
 cat(sprintf("Total time: %.0f min (vs %.0f min with %d vans)\n",
             meta_2$total_cost, meta_vrp$total_cost, meta_vrp$n_vehicles))
 ```
@@ -480,6 +502,7 @@ can also account for time spent at each stop with `service_time` –
 loading/unloading, signatures, etc.
 
 ``` r
+
 n <- nrow(stops)
 result_shift <- route_vrp(
   stops,
@@ -521,6 +544,7 @@ post-optimization phase that redistributes stops to reduce the longest
 route time, at the cost of a small bounded cost increase.
 
 ``` r
+
 result_balanced <- route_vrp(
   stops,
   depot = 1,
@@ -559,6 +583,7 @@ may arrive early and wait, but it cannot begin service after the
 `latest` time.
 
 ``` r
+
 # Simulate availability windows: depot open all day, customers available
 # within a 30-minute window starting at staggered times
 set.seed(42)
@@ -617,6 +642,7 @@ of stops.
 Here’s how to do it with r5r:
 
 ``` r
+
 library(r5r)
 
 # Prepare stop coordinates for r5r
@@ -660,7 +686,7 @@ vrp_route <- seq_len(meta_vrp$n_vehicles) |>
 ```
 
 The same pattern works with other routing engines. With OSRM
-([`osrm::osrmRoute()`](https://rdrr.io/pkg/osrm/man/osrmRoute.html)),
+([`osrm::osrmRoute()`](https://riatelab.r-universe.dev/osrm/reference/osrmRoute.html)),
 you’d request each leg as a pair of coordinates. With mapboxapi
 (`mb_directions()`), you’d pass origin/destination pairs. Pay attention
 to the stop sequence: spopt gives you the optimal order, and the routing

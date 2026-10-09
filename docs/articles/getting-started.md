@@ -12,6 +12,7 @@ The easiest way to install spopt is from my r-universe repository, which
 provides pre-built binaries:
 
 ``` r
+
 install.packages("spopt", repos = "https://walkerke.r-universe.dev")
 ```
 
@@ -19,6 +20,7 @@ Once installed, load the package along with sf for spatial data handling
 and tidyverse for data manipulation:
 
 ``` r
+
 library(spopt)
 library(sf)
 library(tidyverse)
@@ -62,6 +64,7 @@ We’ll find optimal locations for 5 facilities to serve Census tracts in
 Tarrant County, Texas (home of Fort Worth).
 
 ``` r
+
 library(tidycensus)
 
 # Get population data for Tarrant County tracts

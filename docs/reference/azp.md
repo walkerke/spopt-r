@@ -153,7 +153,7 @@ library(sf)
 #> Linking to GEOS 3.13.0, GDAL 3.8.5, PROJ 9.5.1; sf_use_s2() is TRUE
 nc <- st_read(system.file("shape/nc.shp", package = "sf"))
 #> Reading layer `nc' from data source 
-#>   `/Users/kylewalker/Library/R/arm64/4.5/library/sf/shape/nc.shp' 
+#>   `/Library/Frameworks/R.framework/Versions/4.6/Resources/library/sf/shape/nc.shp' 
 #>   using driver `ESRI Shapefile'
 #> Simple feature collection with 100 features and 14 fields
 #> Geometry type: MULTIPOLYGON

@@ -36,7 +36,9 @@ distance_matrix(
 
 - use_centroids:
 
-  Logical. If TRUE (default for polygons), use polygon centroids.
+  Logical. If TRUE, use geometry centroids. Defaults to TRUE when any
+  geometry is not a POINT (polygons, multipoints, lines), so each
+  feature contributes exactly one row or column.
 
 ## Value
 

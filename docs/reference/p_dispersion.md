@@ -103,6 +103,6 @@ result <- p_dispersion(facilities, n_facilities = 5)
 
 # Minimum distance between any two selected facilities
 attr(result, "spopt")$min_distance
-#> [1] 0.4609159
+#> [1] 0.4916683
 # }
 ```

@@ -71,7 +71,8 @@ A list with two sf objects:
 
 - `$demand`: Original demand sf with `.facility` column (primary
   assignment) and `.split` column (TRUE if demand is split across
-  facilities)
+  facilities), and `.cost` column (cost to the primary facility, from
+  the original cost matrix)
 
 - `$facilities`: Original facilities sf with `.selected`, `.n_assigned`,
   and `.utilization` columns
@@ -144,20 +145,20 @@ result$facilities[result$facilities$.selected, c("capacity", ".utilization")]
 #> Simple feature collection with 5 features and 2 fields
 #> Geometry type: POINT
 #> Dimension:     XY
-#> Bounding box:  xmin: 0.01087246 ymin: 0.1990008 xmax: 0.7607611 ymax: 0.8756219
+#> Bounding box:  xmin: 0.01087246 ymin: 0.1990008 xmax: 0.7607611 ymax: 0.7502479
 #> CRS:           NA
 #>    capacity .utilization                     geometry
-#> 2      5000       1.0000  POINT (0.6332316 0.7502479)
-#> 6     10000       1.0000  POINT (0.7607611 0.5438312)
-#> 7     10000       0.7847 POINT (0.01087246 0.1990008)
-#> 10    10000       1.0000  POINT (0.5938366 0.2709778)
-#> 11    20000       0.8475    POINT (0.29756 0.8756219)
+#> 7     10000      1.00000  POINT (0.6332316 0.7502479)
+#> 11    20000      0.27815  POINT (0.7607611 0.5438312)
+#> 12    20000      0.35185 POINT (0.01087246 0.1990008)
+#> 14    20000      0.76560  POINT (0.2638418 0.7502398)
+#> 15    20000      0.59740  POINT (0.5938366 0.2709778)
 
 # Cost-based (optimal number of facilities)
 result <- cflp(demand, facilities, n_facilities = 0,
                weight_col = "population", capacity_col = "capacity",
                facility_cost_col = "fixed_cost")
 attr(result, "spopt")$n_selected
-#> [1] 9
+#> [1] 10
 # }
 ```

@@ -151,9 +151,9 @@ result$facilities[result$facilities$.selected, ]
 #> Simple feature collection with 1 feature and 2 fields
 #> Geometry type: POINT
 #> Dimension:     XY
-#> Bounding box:  xmin: 84.50706 ymin: 64.51147 xmax: 84.50706 ymax: 64.51147
+#> Bounding box:  xmin: 30.21872 ymin: 27.714 xmax: 30.21872 ymax: 27.714
 #> CRS:           NA
-#>   id                  geometry .selected
-#> 1  1 POINT (84.50706 64.51147)      TRUE
+#>    id                geometry .selected
+#> 10 10 POINT (30.21872 27.714)      TRUE
 # }
 ```

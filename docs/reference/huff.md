@@ -72,7 +72,10 @@ A list with:
 
 - `$demand`: Original demand sf with added columns:
 
-  - `.primary_store`: ID of highest-probability store
+  - `.primary_store`: Row index (1-based) of the highest-probability
+    store
+
+  - `.cost`: Cost to the primary store, from the original cost matrix
 
   - `.entropy`: Competition measure (higher = more competition)
 
@@ -177,9 +180,9 @@ result_multi$stores[, c("id", "sqft", "parking", ".market_share", ".expected_sal
 #> Bounding box:  xmin: 2 ymin: 2 xmax: 8 ymax: 8
 #> CRS:           NA
 #>        id  sqft parking .market_share .expected_sales    geometry
-#> 1 Store_A 50000     200     0.2403236        70545.24 POINT (2 2)
-#> 2 Store_B 25000     100     0.1722739        50569.74 POINT (8 8)
-#> 3 Store_C 75000     300     0.5874025       172427.74 POINT (5 5)
+#> 1 Store_A 50000     200     0.2401693        70463.39 POINT (2 2)
+#> 2 Store_B 25000     100     0.1624989        47675.65 POINT (8 8)
+#> 3 Store_C 75000     300     0.5973318       175251.51 POINT (5 5)
 
 # Evaluate a new candidate store
 candidate <- st_as_sf(data.frame(
@@ -201,9 +204,9 @@ result_with_candidate$stores[, c("id", ".market_share")]
 #> Bounding box:  xmin: 2 ymin: 2 xmax: 8 ymax: 8
 #> CRS:           NA
 #>          id .market_share    geometry
-#> 1   Store_A     0.1986106 POINT (2 2)
-#> 2   Store_B     0.1430980 POINT (8 8)
-#> 3   Store_C     0.4351902 POINT (5 5)
-#> 4 New_Store     0.2231012 POINT (3 7)
+#> 1   Store_A     0.1965657 POINT (2 2)
+#> 2   Store_B     0.1343459 POINT (8 8)
+#> 3   Store_C     0.4432445 POINT (5 5)
+#> 4 New_Store     0.2258438 POINT (3 7)
 # }
 ```

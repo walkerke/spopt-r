@@ -208,14 +208,14 @@ print(result)
 #> k-Diverse Corridor Routing (spopt)
 #>   Corridors found: 5 of 5 requested
 #>   Penalty: 2.0x within 12727.9 of each prior path
-#>   Routing time: 0.025s (solve: 0.019s, graph build: 0.006s)
+#>   Routing time: 0.018s (solve: 0.015s, graph build: 0.003s)
 #> 
 #>                          Cost    Distance  Sinuosity     Spacing  Overlap
-#>   Optimal             232,860      277889      1.092           -        -
-#>   Alternative 1       248,368      301161      1.183     16465.5    13.9%
-#>   Alternative 2       270,232      319304      1.254     21895.1    10.1%
-#>   Alternative 3       281,949      329889      1.296     34004.1     9.3%
-#>   Alternative 4       297,476      344960      1.355     35118.9     9.2%
+#>   Optimal             235,887      283161      1.112           -        -
+#>   Alternative 1       250,868      301990      1.186     24532.4    11.9%
+#>   Alternative 2       260,572      303647      1.193     15449.0    12.7%
+#>   Alternative 3       276,486      334132      1.313     39122.7    10.3%
+#>   Alternative 4       291,505      339647      1.334     32416.2    10.4%
 plot(result)
 
 

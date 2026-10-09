@@ -9,6 +9,7 @@ building the package from source.
 Most users should install pre-built binaries from r-universe:
 
 ``` r
+
 install.packages("spopt", repos = "https://walkerke.r-universe.dev")
 ```
 
@@ -39,6 +40,7 @@ Building from source requires several system dependencies.
 3.  **Install the package**:
 
     ``` r
+
     # install.packages("pak")
     pak::pak("walkerke/spopt-r")
     ```
@@ -62,6 +64,7 @@ Building from source requires several system dependencies.
 3.  **Install the package**:
 
     ``` r
+
     pak::pak("walkerke/spopt-r")
     ```
 
@@ -96,6 +99,7 @@ If you must build from source:
 5.  **Install the package**:
 
     ``` r
+
     pak::pak("walkerke/spopt-r")
     ```
 
@@ -106,6 +110,7 @@ If you must build from source:
 After modifying R code in `R/`, regenerate documentation:
 
 ``` r
+
 devtools::document()
 devtools::check()
 ```
@@ -115,6 +120,7 @@ devtools::check()
 The Rust source is in `src/rust/`. After making changes:
 
 ``` r
+
 # Recompile Rust code and reload
 rextendr::document()
 
@@ -125,6 +131,7 @@ devtools::load_all()
 ### Running tests
 
 ``` r
+
 devtools::test()
 ```
 
@@ -133,6 +140,7 @@ devtools::test()
 The vignettes use Quarto. To build the documentation site:
 
 ``` r
+
 pkgdown::build_site()
 ```
 

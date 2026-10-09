@@ -21,7 +21,7 @@ distance_matrix_geographic(x, y = NULL, use_centroids = NULL)
 
 - use_centroids:
 
-  Logical. If TRUE, use polygon centroids.
+  Logical. If TRUE, use geometry centroids.
 
 ## Value
 

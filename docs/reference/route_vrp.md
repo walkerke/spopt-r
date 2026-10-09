@@ -172,10 +172,10 @@ result <- route_vrp(locations, depot = 1, demand_col = "demand", vehicle_capacit
 
 # How many vehicles needed?
 attr(result, "spopt")$n_vehicles
-#> [1] 6
+#> [1] 7
 
 # Per-vehicle costs
 attr(result, "spopt")$vehicle_costs
-#> [1] 1.11 0.90 1.03 1.15 1.35 1.40
+#> [1] 1.94 1.20 1.43 1.64 1.32 2.15 0.54
 # }
 ```

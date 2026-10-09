@@ -22,15 +22,15 @@ A list with four elements:
 
   id
 
-  :   Stop identifier ("depot", "D01", ..., "D25")
+  : Stop identifier ("depot", "D01", ..., "D25")
 
   address
 
-  :   Street address
+  : Street address
 
   packages
 
-  :   Number of packages for delivery (0 for depot)
+  : Number of packages for delivery (0 for depot)
 
 - matrix:
 

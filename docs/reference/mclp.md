@@ -65,7 +65,9 @@ mclp(
 
 A list with two sf objects:
 
-- `$demand`: Original demand sf with `.covered` and `.facility` columns
+- `$demand`: Original demand sf with `.covered`, `.facility`, and
+  `.cost` columns (`.cost` is the cost to the assigned facility, from
+  the original cost matrix; `NA` if uncovered)
 
 - `$facilities`: Original facilities sf with `.selected` column
 
@@ -138,6 +140,6 @@ result <- mclp(demand, facilities, service_radius = 0.3,
                n_facilities = 3, weight_col = "population")
 
 attr(result, "spopt")$coverage_pct
-#> [1] 84.38126
+#> [1] 78.15953
 # }
 ```
