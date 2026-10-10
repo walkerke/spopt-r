@@ -1,4 +1,4 @@
 # License
 
-    YEAR: 2026
-    COPYRIGHT HOLDER: Kyle Walker
+YEAR: 2026\
+COPYRIGHT HOLDER: Kyle Walker\

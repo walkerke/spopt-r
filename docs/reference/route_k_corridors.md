@@ -208,7 +208,7 @@ print(result)
 #> k-Diverse Corridor Routing (spopt)
 #>   Corridors found: 5 of 5 requested
 #>   Penalty: 2.0x within 12727.9 of each prior path
-#>   Routing time: 0.018s (solve: 0.015s, graph build: 0.003s)
+#>   Routing time: 0.020s (solve: 0.016s, graph build: 0.003s)
 #> 
 #>                          Cost    Distance  Sinuosity     Spacing  Overlap
 #>   Optimal             235,887      283161      1.112           -        -

@@ -91,8 +91,8 @@ Metadata is stored in the "spopt" attribute, including:
 ## Details
 
 The CFLP extends the p-median problem by adding capacity constraints.
-Each facility \\j\\ has a maximum capacity \\Q_j\\, and the total demand
-assigned to it cannot exceed this capacity.
+Each facility \\(j\\) has a maximum capacity \\(Q_j\\), and the total
+demand assigned to it cannot exceed this capacity.
 
 When demand exceeds available capacity at the nearest facility, the
 solver may split demand across multiple facilities. The `.split` column

@@ -38,340 +38,31 @@ Let’s analyze grocery store competition in the Austin metro area. We’ll
 use Census block group data to represent consumer demand locations, and
 a set of real store locations.
 
-``` r
-
-library(spopt)
-library(tidycensus)
-library(tidyverse)
-library(sf)
-library(mapgl)
-
-# Get block group data for Travis, Williamson, and Hays counties
-austin_counties <- c("Travis", "Williamson", "Hays")
-
-demand <- get_acs(
-  geography = "block group",
-  variables = c(pop = "B01003_001", income = "B19013_001"),
-  state = "TX",
-  county = austin_counties,
-  geometry = TRUE,
-  year = 2023,
-  output = "wide"
-) |>
-  st_transform(4326) |>
-  filter(!is.na(incomeE)) |>
-  mutate(
-    # Spending potential: population weighted by relative income
-    spending = popE * (incomeE / median(incomeE, na.rm = TRUE))
-  )
-```
-
-      |
-      |                                                                      |   0%
-      |
-      |                                                                      |   1%
-      |
-      |=                                                                     |   1%
-      |
-      |=                                                                     |   2%
-      |
-      |==                                                                    |   2%
-      |
-      |==                                                                    |   3%
-      |
-      |===                                                                   |   4%
-      |
-      |===                                                                   |   5%
-      |
-      |====                                                                  |   5%
-      |
-      |====                                                                  |   6%
-      |
-      |=====                                                                 |   6%
-      |
-      |=====                                                                 |   7%
-      |
-      |=====                                                                 |   8%
-      |
-      |======                                                                |   8%
-      |
-      |======                                                                |   9%
-      |
-      |=======                                                               |   9%
-      |
-      |=======                                                               |  10%
-      |
-      |=======                                                               |  11%
-      |
-      |========                                                              |  11%
-      |
-      |========                                                              |  12%
-      |
-      |=========                                                             |  12%
-      |
-      |=========                                                             |  13%
-      |
-      |==========                                                            |  14%
-      |
-      |==========                                                            |  15%
-      |
-      |===========                                                           |  15%
-      |
-      |===========                                                           |  16%
-      |
-      |============                                                          |  17%
-      |
-      |============                                                          |  18%
-      |
-      |=============                                                         |  18%
-      |
-      |=============                                                         |  19%
-      |
-      |==============                                                        |  19%
-      |
-      |==============                                                        |  20%
-      |
-      |==============                                                        |  21%
-      |
-      |===============                                                       |  21%
-      |
-      |===============                                                       |  22%
-      |
-      |================                                                      |  22%
-      |
-      |================                                                      |  23%
-      |
-      |=================                                                     |  24%
-      |
-      |=================                                                     |  25%
-      |
-      |==================                                                    |  25%
-      |
-      |==================                                                    |  26%
-      |
-      |===================                                                   |  27%
-      |
-      |===================                                                   |  28%
-      |
-      |====================                                                  |  28%
-      |
-      |====================                                                  |  29%
-      |
-      |=====================                                                 |  29%
-      |
-      |=====================                                                 |  30%
-      |
-      |=====================                                                 |  31%
-      |
-      |======================                                                |  31%
-      |
-      |======================                                                |  32%
-      |
-      |=======================                                               |  32%
-      |
-      |=======================                                               |  33%
-      |
-      |========================                                              |  34%
-      |
-      |========================                                              |  35%
-      |
-      |=========================                                             |  35%
-      |
-      |=========================                                             |  36%
-      |
-      |==========================                                            |  37%
-      |
-      |==========================                                            |  38%
-      |
-      |===========================                                           |  38%
-      |
-      |===========================                                           |  39%
-      |
-      |============================                                          |  39%
-      |
-      |============================                                          |  40%
-      |
-      |============================                                          |  41%
-      |
-      |=============================                                         |  41%
-      |
-      |=============================                                         |  42%
-      |
-      |==============================                                        |  42%
-      |
-      |==============================                                        |  43%
-      |
-      |==============================                                        |  44%
-      |
-      |===============================                                       |  44%
-      |
-      |===============================                                       |  45%
-      |
-      |================================                                      |  45%
-      |
-      |================================                                      |  46%
-      |
-      |=================================                                     |  47%
-      |
-      |=================================                                     |  48%
-      |
-      |==================================                                    |  48%
-      |
-      |==================================                                    |  49%
-      |
-      |===================================                                   |  50%
-      |
-      |===================================                                   |  51%
-      |
-      |====================================                                  |  51%
-      |
-      |====================================                                  |  52%
-      |
-      |=====================================                                 |  52%
-      |
-      |=====================================                                 |  53%
-      |
-      |======================================                                |  54%
-      |
-      |======================================                                |  55%
-      |
-      |=======================================                               |  55%
-      |
-      |=======================================                               |  56%
-      |
-      |========================================                              |  57%
-      |
-      |========================================                              |  58%
-      |
-      |=========================================                             |  58%
-      |
-      |=========================================                             |  59%
-      |
-      |==========================================                            |  59%
-      |
-      |==========================================                            |  60%
-      |
-      |==========================================                            |  61%
-      |
-      |===========================================                           |  61%
-      |
-      |===========================================                           |  62%
-      |
-      |============================================                          |  62%
-      |
-      |============================================                          |  63%
-      |
-      |=============================================                         |  64%
-      |
-      |=============================================                         |  65%
-      |
-      |==============================================                        |  65%
-      |
-      |==============================================                        |  66%
-      |
-      |===============================================                       |  66%
-      |
-      |===============================================                       |  67%
-      |
-      |===============================================                       |  68%
-      |
-      |================================================                      |  68%
-      |
-      |================================================                      |  69%
-      |
-      |=================================================                     |  69%
-      |
-      |=================================================                     |  70%
-      |
-      |=================================================                     |  71%
-      |
-      |==================================================                    |  71%
-      |
-      |==================================================                    |  72%
-      |
-      |===================================================                   |  72%
-      |
-      |===================================================                   |  73%
-      |
-      |====================================================                  |  74%
-      |
-      |====================================================                  |  75%
-      |
-      |=====================================================                 |  75%
-      |
-      |=====================================================                 |  76%
-      |
-      |======================================================                |  77%
-      |
-      |======================================================                |  78%
-      |
-      |=======================================================               |  78%
-      |
-      |=======================================================               |  79%
-      |
-      |========================================================              |  79%
-      |
-      |========================================================              |  80%
-      |
-      |========================================================              |  81%
-      |
-      |=========================================================             |  81%
-      |
-      |=========================================================             |  82%
-      |
-      |==========================================================            |  82%
-      |
-      |==========================================================            |  83%
-      |
-      |===========================================================           |  84%
-      |
-      |===========================================================           |  85%
-      |
-      |============================================================          |  85%
-      |
-      |============================================================          |  86%
-      |
-      |=============================================================         |  86%
-      |
-      |=============================================================         |  87%
-      |
-      |=============================================================         |  88%
-      |
-      |==============================================================        |  88%
-      |
-      |==============================================================        |  89%
-      |
-      |===============================================================       |  89%
-      |
-      |===============================================================       |  90%
-      |
-      |===============================================================       |  91%
-      |
-      |================================================================      |  91%
-      |
-      |================================================================      |  92%
-      |
-      |=================================================================     |  92%
-      |
-      |=================================================================     |  93%
-      |
-      |==================================================================    |  94%
-      |
-      |==================================================================    |  95%
-      |
-      |===================================================================   |  95%
-      |
-      |===================================================================   |  96%
-      |
-      |====================================================================  |  97%
-      |
-      |====================================================================  |  98%
-      |
-      |===================================================================== |  98%
-      |
-      |===================================================================== |  99%
-      |
-      |======================================================================| 100%
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`spopt`](https://walker-data.com/spopt-r/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidycensus`](https://walker-data.com/tidycensus/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidyverse`](https://tidyverse.tidyverse.org)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`sf`](https://r-spatial.github.io/sf/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`mapgl`](https://walker-data.com/mapgl/)`)`\
+\
+`# Get block group data for Travis, Williamson, and Hays counties`\
+`austin_counties`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``"Travis"``, ``"Williamson"``, ``"Hays"``)`\
+\
+`demand`` ``<-`` `[`get_acs`](https://walker-data.com/tidycensus/reference/get_acs.html)`(`\
+`  geography ``=`` ``"block group"``,`\
+`  variables ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``pop ``=`` ``"B01003_001"``, income ``=`` ``"B19013_001"``)``,`\
+`  state ``=`` ``"TX"``,`\
+`  county ``=`` ``austin_counties``,`\
+`  geometry ``=`` ``TRUE``,`\
+`  year ``=`` ``2023``,`\
+`  output ``=`` ``"wide"`\
+`)`` ``|>`\
+`  `[`st_transform`](https://r-spatial.github.io/sf/reference/st_transform.html)`(``4326``)`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``!`[`is.na`](https://rdrr.io/r/base/NA.html)`(``incomeE``)``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`    ``# Spending potential: population weighted by relative income`\
+`    spending ``=`` ``popE`` ``*`` ``(``incomeE`` ``/`` `[`median`](https://rspatial.github.io/terra/reference/summarize-generics.html)`(``incomeE``, na.rm ``=`` ``TRUE``)``)`\
+`  ``)`
 
 We’ve created a “spending potential” variable that combines population
 with income - block groups with higher incomes have more spending
@@ -380,23 +71,21 @@ potential per capita. This will serve as our demand weight.
 Now let’s define some store locations. For this example, I’ll create a
 simulated set of HEB and Whole Foods locations in the Austin area:
 
-``` r
-
-stores <- tibble(
-  id = paste0("Store_", 1:8),
-  name = c(
-    "HEB Mueller", "HEB Tech Ridge", "HEB Hancock", "HEB South Congress",
-    "Whole Foods Downtown", "Whole Foods Domain", "HEB Round Rock", "HEB Cedar Park"
-  ),
-  chain = c(rep("HEB", 4), rep("Whole Foods", 2), rep("HEB", 2)),
-  sqft = c(80000, 75000, 55000, 70000, 40000, 35000, 85000, 72000),
-  lon = c(-97.7025, -97.6920, -97.7215, -97.7830,
-          -97.7495, -97.7235, -97.6790, -97.8200),
-  lat = c(30.2950, 30.4420, 30.3030, 30.2280,
-          30.2690, 30.4020, 30.5080, 30.5100)
-) |>
-  st_as_sf(coords = c("lon", "lat"), crs = 4326)
-```
+\
+`stores`` ``<-`` `[`tibble`](https://tibble.tidyverse.org/reference/tibble.html)`(`\
+`  id ``=`` `[`paste0`](https://rdrr.io/r/base/paste.html)`(``"Store_"``, ``1``:``8``)``,`\
+`  name ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(`\
+`    ``"HEB Mueller"``, ``"HEB Tech Ridge"``, ``"HEB Hancock"``, ``"HEB South Congress"``,`\
+`    ``"Whole Foods Downtown"``, ``"Whole Foods Domain"``, ``"HEB Round Rock"``, ``"HEB Cedar Park"`\
+`  ``)``,`\
+`  chain ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(`[`rep`](https://rdrr.io/r/base/rep.html)`(``"HEB"``, ``4``)``, `[`rep`](https://rdrr.io/r/base/rep.html)`(``"Whole Foods"``, ``2``)``, `[`rep`](https://rdrr.io/r/base/rep.html)`(``"HEB"``, ``2``)``)``,`\
+`  sqft ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``80000``, ``75000``, ``55000``, ``70000``, ``40000``, ``35000``, ``85000``, ``72000``)``,`\
+`  lon ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``-``97.7025``, ``-``97.6920``, ``-``97.7215``, ``-``97.7830``,`\
+`          ``-``97.7495``, ``-``97.7235``, ``-``97.6790``, ``-``97.8200``)``,`\
+`  lat ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``30.2950``, ``30.4420``, ``30.3030``, ``30.2280``,`\
+`          ``30.2690``, ``30.4020``, ``30.5080``, ``30.5100``)`\
+`)`` ``|>`\
+`  `[`st_as_sf`](https://r-spatial.github.io/sf/reference/st_as_sf.html)`(``coords ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"lon"``, ``"lat"``)``, crs ``=`` ``4326``)`
 
 ## Running the Huff model
 
@@ -412,17 +101,15 @@ store. We need to provide:
 - `distance_exponent`: Controls how quickly distance reduces
   attractiveness (negative values)
 
-``` r
-
-result <- huff(
-  demand = demand,
-  stores = stores,
-  attractiveness_col = "sqft",
-  attractiveness_exponent = 1.0,
-  distance_exponent = -1.5,
-  sales_potential_col = "spending"
-)
-```
+\
+`result`` ``<-`` `[`huff`](https://walker-data.com/spopt-r/reference/huff.md)`(`\
+`  demand ``=`` ``demand``,`\
+`  stores ``=`` ``stores``,`\
+`  attractiveness_col ``=`` ``"sqft"``,`\
+`  attractiveness_exponent ``=`` ``1.0``,`\
+`  distance_exponent ``=`` ``-``1.5``,`\
+`  sales_potential_col ``=`` ``"spending"`\
+`)`
 
 The function returns a list with two **sf objects** that include all
 results:
@@ -444,35 +131,33 @@ Let’s map the *primary store* for each block group - the store with the
 highest probability of being visited. Since `result$demand` is already
 an sf object with `.primary_store` included, we can map it directly:
 
-``` r
-
-maplibre(bounds = result$demand) |>
-  add_fill_layer(
-    id = "market_areas",
-    source = result$demand,
-    fill_color = match_expr(
-      column = ".primary_store",
-      values = 1:8,
-      stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3",
-                "#ff7f00", "#a65628", "#f781bf", "#999999")
-    ),
-    fill_opacity = 0.6
-  ) |>
-  add_line_layer(
-    id = "borders",
-    source = result$demand,
-    line_color = "white",
-    line_width = 0.3
-  ) |>
-  add_circle_layer(
-    id = "stores",
-    source = result$stores,
-    circle_color = "black",
-    circle_radius = 8,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``result``$``demand``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"market_areas"``,`\
+`    source ``=`` ``result``$``demand``,`\
+`    fill_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`      column ``=`` ``".primary_store"``,`\
+`      values ``=`` ``1``:``8``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#e41a1c"``, ``"#377eb8"``, ``"#4daf4a"``, ``"#984ea3"``,`\
+`                ``"#ff7f00"``, ``"#a65628"``, ``"#f781bf"``, ``"#999999"``)`\
+`    ``)``,`\
+`    fill_opacity ``=`` ``0.6`\
+`  ``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"borders"``,`\
+`    source ``=`` ``result``$``demand``,`\
+`    line_color ``=`` ``"white"``,`\
+`    line_width ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"stores"``,`\
+`    source ``=`` ``result``$``stores``,`\
+`    circle_color ``=`` ``"black"``,`\
+`    circle_radius ``=`` ``8``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 The map shows each block group colored by its primary store. This gives
 us a quick sense of each store’s *trade area* - the geographic region
@@ -487,13 +172,11 @@ foot traffic, etc.) might be used here.
 The `stores` result contains market share and expected sales for each
 location:
 
-``` r
-
-result$stores |>
-  st_drop_geometry() |>
-  select(name, chain, sqft, .expected_sales, .market_share) |>
-  arrange(desc(.market_share))
-```
+\
+`result``$``stores`` ``|>`\
+`  `[`st_drop_geometry`](https://r-spatial.github.io/sf/reference/st_geometry.html)`(``)`` ``|>`\
+`  `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``name``, ``chain``, ``sqft``, ``.expected_sales``, ``.market_share``)`` ``|>`\
+`  `[`arrange`](https://dplyr.tidyverse.org/reference/arrange.html)`(`[`desc`](https://dplyr.tidyverse.org/reference/desc.html)`(``.market_share``)``)`
 
     # A tibble: 8 × 5
       name                 chain        sqft .expected_sales .market_share
@@ -518,29 +201,27 @@ measure of competition intensity. Entropy is high when consumers have
 multiple similarly-attractive options, and low when one store dominates.
 This is included directly in `result$demand`:
 
-``` r
-
-maplibre(bounds = result$demand) |>
-  add_fill_layer(
-    id = "entropy",
-    source = result$demand,
-    fill_color = interpolate(
-      column = ".entropy",
-      values = c(0, 1.5, 2),
-      stops = c("#2166ac", "#f7f7f7", "#b2182b")
-    ),
-    fill_opacity = 0.7,
-    tooltip = ".entropy"
-  ) |>
-  add_circle_layer(
-    id = "stores",
-    source = result$stores,
-    circle_color = "black",
-    circle_radius = 8,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``result``$``demand``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"entropy"``,`\
+`    source ``=`` ``result``$``demand``,`\
+`    fill_color ``=`` ``interpolate``(`\
+`      column ``=`` ``".entropy"``,`\
+`      values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``0``, ``1.5``, ``2``)``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#2166ac"``, ``"#f7f7f7"``, ``"#b2182b"``)`\
+`    ``)``,`\
+`    fill_opacity ``=`` ``0.7``,`\
+`    tooltip ``=`` ``".entropy"`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"stores"``,`\
+`    source ``=`` ``result``$``stores``,`\
+`    circle_color ``=`` ``"black"``,`\
+`    circle_radius ``=`` ``8``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 Areas with high entropy (red) have intense competition - consumers there
 have multiple good options. Low-entropy areas (blue) are dominated by a
@@ -553,45 +234,43 @@ One of the most powerful applications of the Huff model is *what-if
 analysis* - evaluating how a new store would affect market share. Let’s
 test a potential new location in south Austin:
 
-``` r
-
-# Add a hypothetical new store
-new_store <- tibble(
-  id = "Store_9",
-  name = "New HEB South Austin",
-  chain = "HEB",
-  sqft = 70000,
-  lon = -97.78,
-  lat = 30.20
-) |>
-  st_as_sf(coords = c("lon", "lat"), crs = 4326)
-
-stores_with_new <- bind_rows(stores, new_store)
-
-# Re-run the model
-result_new <- huff(
-  demand = demand,
-  stores = stores_with_new,
-  attractiveness_col = "sqft",
-  attractiveness_exponent = 1.0,
-  distance_exponent = -1.5,
-  sales_potential_col = "spending"
-)
-
-# Compare market shares
-comparison <- result$stores |>
-  st_drop_geometry() |>
-  select(name, original_share = .market_share) |>
-  left_join(
-    result_new$stores |>
-      st_drop_geometry() |>
-      select(name, new_share = .market_share),
-    by = "name"
-  ) |>
-  mutate(change = new_share - original_share)
-
-comparison
-```
+\
+`# Add a hypothetical new store`\
+`new_store`` ``<-`` `[`tibble`](https://tibble.tidyverse.org/reference/tibble.html)`(`\
+`  id ``=`` ``"Store_9"``,`\
+`  name ``=`` ``"New HEB South Austin"``,`\
+`  chain ``=`` ``"HEB"``,`\
+`  sqft ``=`` ``70000``,`\
+`  lon ``=`` ``-``97.78``,`\
+`  lat ``=`` ``30.20`\
+`)`` ``|>`\
+`  `[`st_as_sf`](https://r-spatial.github.io/sf/reference/st_as_sf.html)`(``coords ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"lon"``, ``"lat"``)``, crs ``=`` ``4326``)`\
+\
+`stores_with_new`` ``<-`` `[`bind_rows`](https://dplyr.tidyverse.org/reference/bind_rows.html)`(``stores``, ``new_store``)`\
+\
+`# Re-run the model`\
+`result_new`` ``<-`` `[`huff`](https://walker-data.com/spopt-r/reference/huff.md)`(`\
+`  demand ``=`` ``demand``,`\
+`  stores ``=`` ``stores_with_new``,`\
+`  attractiveness_col ``=`` ``"sqft"``,`\
+`  attractiveness_exponent ``=`` ``1.0``,`\
+`  distance_exponent ``=`` ``-``1.5``,`\
+`  sales_potential_col ``=`` ``"spending"`\
+`)`\
+\
+`# Compare market shares`\
+`comparison`` ``<-`` ``result``$``stores`` ``|>`\
+`  `[`st_drop_geometry`](https://r-spatial.github.io/sf/reference/st_geometry.html)`(``)`` ``|>`\
+`  `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``name``, original_share ``=`` ``.market_share``)`` ``|>`\
+`  `[`left_join`](https://dplyr.tidyverse.org/reference/mutate-joins.html)`(`\
+`    ``result_new``$``stores`` ``|>`\
+`      `[`st_drop_geometry`](https://r-spatial.github.io/sf/reference/st_geometry.html)`(``)`` ``|>`\
+`      `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``name``, new_share ``=`` ``.market_share``)``,`\
+`    by ``=`` ``"name"`\
+`  ``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``change ``=`` ``new_share`` ``-`` ``original_share``)`\
+\
+`comparison`
 
     # A tibble: 8 × 4
       name                 original_share new_share   change
@@ -611,35 +290,33 @@ decline, while distant stores are not as affected.
 
 Let’s visualize how the new store reshapes market areas:
 
-``` r
-
-maplibre(bounds = result_new$demand) |>
-  add_fill_layer(
-    id = "market_areas",
-    source = result_new$demand,
-    fill_color = match_expr(
-      column = ".primary_store",
-      values = 1:9,
-      stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3",
-                "#ff7f00", "#a65628", "#f781bf", "#999999", "#66c2a5")
-    ),
-    fill_opacity = 0.6
-  ) |>
-  add_line_layer(
-    id = "borders",
-    source = result_new$demand,
-    line_color = "white",
-    line_width = 0.3
-  ) |>
-  add_circle_layer(
-    id = "stores",
-    source = result_new$stores,
-    circle_color = "black",
-    circle_radius = 8,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``result_new``$``demand``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"market_areas"``,`\
+`    source ``=`` ``result_new``$``demand``,`\
+`    fill_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`      column ``=`` ``".primary_store"``,`\
+`      values ``=`` ``1``:``9``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#e41a1c"``, ``"#377eb8"``, ``"#4daf4a"``, ``"#984ea3"``,`\
+`                ``"#ff7f00"``, ``"#a65628"``, ``"#f781bf"``, ``"#999999"``, ``"#66c2a5"``)`\
+`    ``)``,`\
+`    fill_opacity ``=`` ``0.6`\
+`  ``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"borders"``,`\
+`    source ``=`` ``result_new``$``demand``,`\
+`    line_color ``=`` ``"white"``,`\
+`    line_width ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"stores"``,`\
+`    source ``=`` ``result_new``$``stores``,`\
+`    circle_color ``=`` ``"black"``,`\
+`    circle_radius ``=`` ``8``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 Compare this to the original market area map above - the new store
 (teal) carves out its own trade area in south Austin, primarily at the
@@ -662,18 +339,16 @@ significantly affect results:
 - Values \> 1: Larger stores disproportionately attractive
 - Values \< 1: Diminishing returns to size
 
-``` r
-
-# Test with stronger distance decay
-result_steep <- huff(
-  demand = demand,
-  stores = stores,
-  attractiveness_col = "sqft",
-  attractiveness_exponent = 1.0,
-  distance_exponent = -2.5,  # Much steeper decay
-  sales_potential_col = "spending"
-)
-```
+\
+`# Test with stronger distance decay`\
+`result_steep`` ``<-`` `[`huff`](https://walker-data.com/spopt-r/reference/huff.md)`(`\
+`  demand ``=`` ``demand``,`\
+`  stores ``=`` ``stores``,`\
+`  attractiveness_col ``=`` ``"sqft"``,`\
+`  attractiveness_exponent ``=`` ``1.0``,`\
+`  distance_exponent ``=`` ``-``2.5``,  ``# Much steeper decay`\
+`  sales_potential_col ``=`` ``"spending"`\
+`)`
 
 With a steeper distance decay (-2.5 vs -1.5), trade areas become smaller
 and more localized. This might be more realistic for
@@ -686,44 +361,40 @@ combine multiple factors - size, brand perception, parking availability,
 product selection. spopt supports multiple attractiveness variables
 directly:
 
-``` r
-
-# Add parking data to stores
-stores_extended <- stores |>
-  mutate(parking = c(300, 250, 150, 200, 120, 100, 350, 275))
-
-# Use both sqft and parking as attractiveness factors
-result_multi <- huff(
-  demand = demand,
-  stores = stores_extended,
-  attractiveness_col = c("sqft", "parking"),
-  attractiveness_exponent = c(1.0, 0.5),  # parking has diminishing returns
-  distance_exponent = -1.5,
-  sales_potential_col = "spending"
-)
-```
+\
+`# Add parking data to stores`\
+`stores_extended`` ``<-`` ``stores`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``parking ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``300``, ``250``, ``150``, ``200``, ``120``, ``100``, ``350``, ``275``)``)`\
+\
+`# Use both sqft and parking as attractiveness factors`\
+`result_multi`` ``<-`` `[`huff`](https://walker-data.com/spopt-r/reference/huff.md)`(`\
+`  demand ``=`` ``demand``,`\
+`  stores ``=`` ``stores_extended``,`\
+`  attractiveness_col ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"sqft"``, ``"parking"``)``,`\
+`  attractiveness_exponent ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``1.0``, ``0.5``)``,  ``# parking has diminishing returns`\
+`  distance_exponent ``=`` ``-``1.5``,`\
+`  sales_potential_col ``=`` ``"spending"`\
+`)`
 
 The composite attractiveness is computed as
 $`A_j = \text{sqft}^{1.0} \times \text{parking}^{0.5}`$. You can also
 pre-compute a single attractiveness column if you prefer:
 
-``` r
-
-stores_composite <- stores |>
-  mutate(
-    # HEB stores get a 20% brand premium
-    brand_factor = if_else(chain == "HEB", 1.2, 1.0),
-    attractiveness = sqft * brand_factor
-  )
-
-result_composite <- huff(
-  demand = demand,
-  stores = stores_composite,
-  attractiveness_col = "attractiveness",
-  distance_exponent = -1.5,
-  sales_potential_col = "spending"
-)
-```
+\
+`stores_composite`` ``<-`` ``stores`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`    ``# HEB stores get a 20% brand premium`\
+`    brand_factor ``=`` `[`if_else`](https://dplyr.tidyverse.org/reference/if_else.html)`(``chain`` ``==`` ``"HEB"``, ``1.2``, ``1.0``)``,`\
+`    attractiveness ``=`` ``sqft`` ``*`` ``brand_factor`\
+`  ``)`\
+\
+`result_composite`` ``<-`` `[`huff`](https://walker-data.com/spopt-r/reference/huff.md)`(`\
+`  demand ``=`` ``demand``,`\
+`  stores ``=`` ``stores_composite``,`\
+`  attractiveness_col ``=`` ``"attractiveness"``,`\
+`  distance_exponent ``=`` ``-``1.5``,`\
+`  sales_potential_col ``=`` ``"spending"`\
+`)`
 
 ## Next steps
 

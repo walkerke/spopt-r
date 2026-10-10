@@ -56,7 +56,7 @@ print(g)
 #>   Grid: 500 x 500 (250,000 cells)
 #>   Cell size: 1000.0 x 1000.0
 #>   Neighbours: 8 (1,994,004 edges)
-#>   Build time: 0.005s | Graph storage: ~33.9 MB
+#>   Build time: 0.006s | Graph storage: ~33.9 MB
 path <- route_corridor(g, c(50000, 50000), c(450000, 450000))
 # }
 ```

@@ -15,7 +15,7 @@ that follow a road network instead.'><meta property="og:image" content="https://
 
     <a class="navbar-brand me-2" href="../index.html">spopt</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.3.9000</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -67,7 +67,8 @@ that follow a road network instead.</p>
 <span>  min_share <span class="op">=</span> <span class="fl">0</span>,</span>
 <span>  cost_matrix <span class="op">=</span> <span class="cn">NULL</span>,</span>
 <span>  anchor <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"centroid"</span>, <span class="st">"point_on_surface"</span><span class="op">)</span>,</span>
-<span>  route_fun <span class="op">=</span> <span class="cn">NULL</span></span>
+<span>  route_fun <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  facilities <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -120,6 +121,13 @@ sfc object with one LINESTRING or MULTILINESTRING per row, in input order,
 with a known CRS. Return an empty geometry for a pair that cannot be
 routed; those links fall back to straight lines. <code><a href="r5r_route_fun.html">r5r_route_fun()</a></code>
 builds such a function from an r5r network.</p></dd>
+
+
+<dt id="arg-facilities">facilities<a class="anchor" aria-label="anchor" href="#arg-facilities"></a></dt>
+<dd><p>Optional integer row indices of <code>result$facilities</code> (or
+<code>result$stores</code>) to draw links for. Other facilities' links are skipped
+before any geometry is built, so drawing one store's trade area from a
+large <code><a href="huff.html">huff()</a></code> result stays fast.</p></dd>
 
 </dl></div>
     <div class="section level2">

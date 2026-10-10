@@ -21,7 +21,8 @@ spider_lines(
   min_share = 0,
   cost_matrix = NULL,
   anchor = c("centroid", "point_on_surface"),
-  route_fun = NULL
+  route_fun = NULL,
+  facilities = NULL
 )
 ```
 
@@ -85,6 +86,15 @@ spider_lines(
   cannot be routed; those links fall back to straight lines.
   [`r5r_route_fun()`](https://walker-data.com/spopt-r/reference/r5r_route_fun.md)
   builds such a function from an r5r network.
+
+- facilities:
+
+  Optional integer row indices of `result$facilities` (or
+  `result$stores`) to draw links for. Other facilities' links are
+  skipped before any geometry is built, so drawing one store's trade
+  area from a large
+  [`huff()`](https://walker-data.com/spopt-r/reference/huff.md) result
+  stays fast.
 
 ## Value
 

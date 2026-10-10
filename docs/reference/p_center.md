@@ -90,11 +90,11 @@ Two algorithms are available:
 The direct MIP formulation is: \$\$\min W\$\$ Subject to: \$\$\sum_j y_j
 = p\$\$ \$\$\sum_j x\_{ij} = 1 \quad \forall i\$\$ \$\$x\_{ij} \leq y_j
 \quad \forall i,j\$\$ \$\$\sum_j d\_{ij} x\_{ij} \leq W \quad \forall
-i\$\$ \$\$x\_{ij}, y_j \in \\0,1\\\$\$
+i\$\$ \$\$x\_{ij}, y_j \in \\{0,1\\}\$\$
 
-Where W is the maximum distance to minimize, \\d\_{ij}\\ is the distance
-from demand i to facility j, \\x\_{ij} = 1\\ if demand i is assigned to
-facility j, and \\y_j = 1\\ if facility j is selected.
+Where W is the maximum distance to minimize, \\(d\_{ij}\\) is the
+distance from demand i to facility j, \\(x\_{ij} = 1\\) if demand i is
+assigned to facility j, and \\(y_j = 1\\) if facility j is selected.
 
 ## Use Cases
 

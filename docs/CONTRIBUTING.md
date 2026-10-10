@@ -8,10 +8,8 @@ building the package from source.
 
 Most users should install pre-built binaries from r-universe:
 
-``` r
-
-install.packages("spopt", repos = "https://walkerke.r-universe.dev")
-```
+\
+[`install.packages`](https://rdrr.io/r/utils/install.packages.html)`(``"spopt"``, repos ``=`` ``"https://walkerke.r-universe.dev"``)`
 
 The instructions below are for **contributors and developers** who need
 to build from source.
@@ -39,11 +37,9 @@ Building from source requires several system dependencies.
 
 3.  **Install the package**:
 
-    ``` r
-
-    # install.packages("pak")
-    pak::pak("walkerke/spopt-r")
-    ```
+    \
+    `# install.packages("pak")`\
+    `pak``::`[`pak`](https://pak.r-lib.org/reference/pak.html)`(``"walkerke/spopt-r"``)`
 
 ### Linux (Ubuntu/Debian)
 
@@ -63,10 +59,8 @@ Building from source requires several system dependencies.
 
 3.  **Install the package**:
 
-    ``` r
-
-    pak::pak("walkerke/spopt-r")
-    ```
+    \
+    `pak``::`[`pak`](https://pak.r-lib.org/reference/pak.html)`(``"walkerke/spopt-r"``)`
 
 ### Windows
 
@@ -98,10 +92,8 @@ If you must build from source:
 
 5.  **Install the package**:
 
-    ``` r
-
-    pak::pak("walkerke/spopt-r")
-    ```
+    \
+    `pak``::`[`pak`](https://pak.r-lib.org/reference/pak.html)`(``"walkerke/spopt-r"``)`
 
 ## Development workflow
 
@@ -109,40 +101,32 @@ If you must build from source:
 
 After modifying R code in `R/`, regenerate documentation:
 
-``` r
-
-devtools::document()
-devtools::check()
-```
+\
+`devtools``::`[`document`](https://devtools.r-lib.org/reference/document.html)`(``)`\
+`devtools``::`[`check`](https://devtools.r-lib.org/reference/check.html)`(``)`
 
 ### Making changes to Rust code
 
 The Rust source is in `src/rust/`. After making changes:
 
-``` r
-
-# Recompile Rust code and reload
-rextendr::document()
-
-# Or for a full rebuild
-devtools::load_all()
-```
+\
+`# Recompile Rust code and reload`\
+`rextendr``::`[`document`](https://extendr.github.io/rextendr/reference/document.html)`(``)`\
+\
+`# Or for a full rebuild`\
+`devtools``::`[`load_all`](https://devtools.r-lib.org/reference/load_all.html)`(``)`
 
 ### Running tests
 
-``` r
-
-devtools::test()
-```
+\
+`devtools``::`[`test`](https://devtools.r-lib.org/reference/test.html)`(``)`
 
 ### Building the pkgdown site
 
 The vignettes use Quarto. To build the documentation site:
 
-``` r
-
-pkgdown::build_site()
-```
+\
+`pkgdown``::`[`build_site`](https://pkgdown.r-lib.org/reference/build_site.html)`(``)`
 
 ## Reporting issues
 

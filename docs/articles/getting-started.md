@@ -11,20 +11,16 @@ to R users with an sf-first API and a Rust backend for performance.
 The easiest way to install spopt is from my r-universe repository, which
 provides pre-built binaries:
 
-``` r
-
-install.packages("spopt", repos = "https://walkerke.r-universe.dev")
-```
+\
+[`install.packages`](https://rdrr.io/r/utils/install.packages.html)`(``"spopt"``, repos ``=`` ``"https://walkerke.r-universe.dev"``)`
 
 Once installed, load the package along with sf for spatial data handling
 and tidyverse for data manipulation:
 
-``` r
-
-library(spopt)
-library(sf)
-library(tidyverse)
-```
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`spopt`](https://walker-data.com/spopt-r/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`sf`](https://r-spatial.github.io/sf/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidyverse`](https://tidyverse.tidyverse.org)`)`
 
 ### What can spopt do?
 
@@ -63,36 +59,34 @@ Let’s run a quick facility location analysis to see spopt in action.
 We’ll find optimal locations for 5 facilities to serve Census tracts in
 Tarrant County, Texas (home of Fort Worth).
 
-``` r
-
-library(tidycensus)
-
-# Get population data for Tarrant County tracts
-tarrant <- get_acs(
-  geography = "tract",
-  variables = "B01003_001",
-  state = "TX",
-  county = "Tarrant",
-  geometry = TRUE,
-  year = 2023
-)
-
-# Use tract centroids as both demand points and candidate facility sites
-tarrant_pts <- tarrant |>
-  st_centroid() |>
-  filter(!is.na(estimate))
-
-# Solve the P-Median problem: minimize total weighted distance
-result <- p_median(
-  demand = tarrant_pts,
-  facilities = tarrant_pts,
-  n_facilities = 5,
-  weight_col = "estimate"
-)
-
-# View selected facility locations
-result$facilities |> filter(.selected)
-```
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidycensus`](https://walker-data.com/tidycensus/)`)`\
+\
+`# Get population data for Tarrant County tracts`\
+`tarrant`` ``<-`` `[`get_acs`](https://walker-data.com/tidycensus/reference/get_acs.html)`(`\
+`  geography ``=`` ``"tract"``,`\
+`  variables ``=`` ``"B01003_001"``,`\
+`  state ``=`` ``"TX"``,`\
+`  county ``=`` ``"Tarrant"``,`\
+`  geometry ``=`` ``TRUE``,`\
+`  year ``=`` ``2023`\
+`)`\
+\
+`# Use tract centroids as both demand points and candidate facility sites`\
+`tarrant_pts`` ``<-`` ``tarrant`` ``|>`\
+`  `[`st_centroid`](https://r-spatial.github.io/sf/reference/geos_unary.html)`(``)`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``!`[`is.na`](https://rdrr.io/r/base/NA.html)`(``estimate``)``)`\
+\
+`# Solve the P-Median problem: minimize total weighted distance`\
+`result`` ``<-`` `[`p_median`](https://walker-data.com/spopt-r/reference/p_median.md)`(`\
+`  demand ``=`` ``tarrant_pts``,`\
+`  facilities ``=`` ``tarrant_pts``,`\
+`  n_facilities ``=`` ``5``,`\
+`  weight_col ``=`` ``"estimate"`\
+`)`\
+\
+`# View selected facility locations`\
+`result``$``facilities`` ``|>`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`
 
     Simple feature collection with 5 features and 8 fields
     Geometry type: POINT

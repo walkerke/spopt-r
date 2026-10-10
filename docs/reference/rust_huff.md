@@ -1,8 +1,8 @@
 # Compute Huff Model probabilities
 
 Computes probability surface based on distance decay and attractiveness.
-Formula: \\P\_{ij} = (A_j \times D\_{ij}^\beta) / \Sigma_k(A_k \times
-D\_{ik}^\beta)\\
+Formula: \\(P\_{ij} = (A_j \times D\_{ij}^\beta) / \Sigma_k(A_k \times
+D\_{ik}^\beta)\\)
 
 ## Usage
 

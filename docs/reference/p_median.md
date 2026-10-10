@@ -80,11 +80,11 @@ siting.
 The integer programming formulation is: \$\$\min \sum_i \sum_j w_i
 d\_{ij} x\_{ij}\$\$ Subject to: \$\$\sum_j y_j = p\$\$ \$\$\sum_j
 x\_{ij} = 1 \quad \forall i\$\$ \$\$x\_{ij} \leq y_j \quad \forall
-i,j\$\$ \$\$x\_{ij}, y_j \in \\0,1\\\$\$
+i,j\$\$ \$\$x\_{ij}, y_j \in \\{0,1\\}\$\$
 
-Where \\w_i\\ is the demand weight at location i, \\d\_{ij}\\ is the
-distance from demand i to facility j, \\x\_{ij} = 1\\ if demand i is
-assigned to facility j, and \\y_j = 1\\ if facility j is selected.
+Where \\(w_i\\) is the demand weight at location i, \\(d\_{ij}\\) is the
+distance from demand i to facility j, \\(x\_{ij} = 1\\) if demand i is
+assigned to facility j, and \\(y_j = 1\\) if facility j is selected.
 
 ## Use Cases
 

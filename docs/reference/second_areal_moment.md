@@ -38,8 +38,8 @@ While the y axis is in a similar form: \$\$I_y =
 \frac{1}{12}\sum\_{i=1}^{N} (x_i y\_{i+1} - x\_{i+1}y_i) (y_i^2 +
 y_iy\_{i+1} + y\_{i+1}^2)\$\$
 
-where \\x_i, y_i\\ is the current point and \\x\_{i+1}, y\_{i+1}\\ is
-the next point, and where \\x\_{n+1} = x_1, y\_{n+1} = y_1\\.
+where \\(x_i, y_i\\) is the current point and \\(x\_{i+1}, y\_{i+1}\\)
+is the next point, and where \\(x\_{n+1} = x_1, y\_{n+1} = y_1\\).
 
 For multipart polygons with holes, all parts are treated as separate
 contributions to the overall centroid, which provides the same result as

@@ -35,71 +35,67 @@ centers to serve the population of Tarrant County. We’ll use Census
 tract centroids as demand points, and sample 30 candidate locations from
 across the county to represent potential facility sites.
 
-``` r
-
-library(spopt)
-library(tidycensus)
-library(tidyverse)
-library(sf)
-library(mapgl)
-
-# Get tract-level population data
-tarrant <- get_acs(
-  geography = "tract",
-  variables = "B01003_001",
-  state = "TX",
-  county = "Tarrant",
-  geometry = TRUE,
-  year = 2023
-) |>
-  filter(estimate > 0) |>
-  rename(population = estimate)
-
-# Demand points: all tract centroids
-demand_pts <- tarrant |>
-  st_centroid()
-
-# Candidate facilities: sample 30 locations across the county
-# In practice, these might be specific parcels, existing buildings, or zoned commercial sites
-set.seed(1983)
-n_candidates <- 30
-
-county_boundary <- tarrant |> st_union()
-candidate_pts <- st_sample(county_boundary, n_candidates) |>
-  st_as_sf() |>
-  mutate(id = row_number())
-```
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`spopt`](https://walker-data.com/spopt-r/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidycensus`](https://walker-data.com/tidycensus/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidyverse`](https://tidyverse.tidyverse.org)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`sf`](https://r-spatial.github.io/sf/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`mapgl`](https://walker-data.com/mapgl/)`)`\
+\
+`# Get tract-level population data`\
+`tarrant`` ``<-`` `[`get_acs`](https://walker-data.com/tidycensus/reference/get_acs.html)`(`\
+`  geography ``=`` ``"tract"``,`\
+`  variables ``=`` ``"B01003_001"``,`\
+`  state ``=`` ``"TX"``,`\
+`  county ``=`` ``"Tarrant"``,`\
+`  geometry ``=`` ``TRUE``,`\
+`  year ``=`` ``2023`\
+`)`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``estimate`` ``>`` ``0``)`` ``|>`\
+`  `[`rename`](https://dplyr.tidyverse.org/reference/rename.html)`(``population ``=`` ``estimate``)`\
+\
+`# Demand points: all tract centroids`\
+`demand_pts`` ``<-`` ``tarrant`` ``|>`\
+`  `[`st_centroid`](https://r-spatial.github.io/sf/reference/geos_unary.html)`(``)`\
+\
+`# Candidate facilities: sample 30 locations across the county`\
+`# In practice, these might be specific parcels, existing buildings, or zoned commercial sites`\
+[`set.seed`](https://rdrr.io/r/base/Random.html)`(``1983``)`\
+`n_candidates`` ``<-`` ``30`\
+\
+`county_boundary`` ``<-`` ``tarrant`` ``|>`` `[`st_union`](https://r-spatial.github.io/sf/reference/geos_combine.html)`(``)`\
+`candidate_pts`` ``<-`` `[`st_sample`](https://r-spatial.github.io/sf/reference/st_sample.html)`(``county_boundary``, ``n_candidates``)`` ``|>`\
+`  `[`st_as_sf`](https://r-spatial.github.io/sf/reference/st_as_sf.html)`(``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``id ``=`` `[`row_number`](https://dplyr.tidyverse.org/reference/row_number.html)`(``)``)`
 
 We now have 448 demand points (tract centroids) and 30 candidate
 facility locations. This setup mirrors real-world planning where you’re
 evaluating a shortlist of potential sites.
 
-``` r
-
-# Visualize the setup
-maplibre(bounds = tarrant) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tarrant,
-    fill_color = "lightgray",
-    fill_opacity = 0.3
-  ) |>
-  add_circle_layer(
-    id = "demand",
-    source = demand_pts,
-    circle_color = "steelblue",
-    circle_radius = 3,
-    circle_opacity = 0.5
-  ) |>
-  add_circle_layer(
-    id = "candidates",
-    source = candidate_pts,
-    circle_color = "black",
-    circle_radius = 6,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+`# Visualize the setup`\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tarrant``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tarrant``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"demand"``,`\
+`    source ``=`` ``demand_pts``,`\
+`    circle_color ``=`` ``"steelblue"``,`\
+`    circle_radius ``=`` ``3``,`\
+`    circle_opacity ``=`` ``0.5`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"candidates"``,`\
+`    source ``=`` ``candidate_pts``,`\
+`    circle_color ``=`` ``"black"``,`\
+`    circle_radius ``=`` ``6``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 ## P-Median: Minimizing total distance
 
@@ -108,15 +104,13 @@ total weighted distance from demand points to their assigned facilities.
 This is the classic efficiency-focused location model - it finds
 locations that minimize how far people, on average, must travel.
 
-``` r
-
-result_pmedian <- p_median(
-  demand = demand_pts,
-  facilities = candidate_pts,
-  n_facilities = 5,
-  weight_col = "population"
-)
-```
+\
+`result_pmedian`` ``<-`` `[`p_median`](https://walker-data.com/spopt-r/reference/p_median.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_pts``,`\
+`  n_facilities ``=`` ``5``,`\
+`  weight_col ``=`` ``"population"`\
+`)`
 
 The solver runs quickly with 30 candidates - the optimization scales
 with the number of candidate sites, not demand points. Each demand point
@@ -128,51 +122,49 @@ To visualize the allocation,
 draws a line from each demand point to the facility that serves it.
 These are sometimes called *allocation lines* or *desire lines*.
 
-``` r
-
-# One line per tract, from the tract to its assigned facility
-pmedian_lines <- spider_lines(result_pmedian) |>
-  mutate(facility = as.character(facility_index))
-
-# Get selected facility locations
-selected <- result_pmedian$facilities |>
-  filter(.selected) |>
-  mutate(id = as.character(id))
-
-facility_colors <- c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
-
-# Map the results
-maplibre(bounds = tarrant) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tarrant,
-    fill_color = "lightgray",
-    fill_opacity = 0.3
-  ) |>
-  add_line_layer(
-    id = "allocations",
-    source = pmedian_lines,
-    line_color = match_expr(
-      column = "facility",
-      values = selected$id,
-      stops = facility_colors
-    ),
-    line_width = 1,
-    line_opacity = 0.6
-  ) |>
-  add_circle_layer(
-    id = "facilities",
-    source = selected,
-    circle_color = match_expr(
-      column = "id",
-      values = selected$id,
-      stops = facility_colors
-    ),
-    circle_radius = 10,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+`# One line per tract, from the tract to its assigned facility`\
+`pmedian_lines`` ``<-`` `[`spider_lines`](https://walker-data.com/spopt-r/reference/spider_lines.md)`(``result_pmedian``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``facility ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``facility_index``)``)`\
+\
+`# Get selected facility locations`\
+`selected`` ``<-`` ``result_pmedian``$``facilities`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``id ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``id``)``)`\
+\
+`facility_colors`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#e41a1c"``, ``"#377eb8"``, ``"#4daf4a"``, ``"#984ea3"``, ``"#ff7f00"``)`\
+\
+`# Map the results`\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tarrant``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tarrant``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"allocations"``,`\
+`    source ``=`` ``pmedian_lines``,`\
+`    line_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`      column ``=`` ``"facility"``,`\
+`      values ``=`` ``selected``$``id``,`\
+`      stops ``=`` ``facility_colors`\
+`    ``)``,`\
+`    line_width ``=`` ``1``,`\
+`    line_opacity ``=`` ``0.6`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"facilities"``,`\
+`    source ``=`` ``selected``,`\
+`    circle_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`      column ``=`` ``"id"``,`\
+`      values ``=`` ``selected``$``id``,`\
+`      stops ``=`` ``facility_colors`\
+`    ``)``,`\
+`    circle_radius ``=`` ``10``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 Each line connects a tract to its assigned facility, colored by
 facility. The solution minimizes the total population-weighted distance.
@@ -181,17 +173,15 @@ Along with the geometry,
 returns each link’s `weight` (the tract’s population) and `cost` (its
 distance), so you can summarize the allocation directly:
 
-``` r
-
-pmedian_lines |>
-  st_drop_geometry() |>
-  group_by(facility) |>
-  summarize(
-    tracts = n(),
-    population = sum(weight),
-    mean_km = weighted.mean(cost, weight) / 1000
-  )
-```
+\
+`pmedian_lines`` ``|>`\
+`  `[`st_drop_geometry`](https://r-spatial.github.io/sf/reference/st_geometry.html)`(``)`` ``|>`\
+`  `[`group_by`](https://dplyr.tidyverse.org/reference/group_by.html)`(``facility``)`` ``|>`\
+`  `[`summarize`](https://dplyr.tidyverse.org/reference/summarise.html)`(`\
+`    tracts ``=`` `[`n`](https://dplyr.tidyverse.org/reference/context.html)`(``)``,`\
+`    population ``=`` `[`sum`](https://rdrr.io/r/base/sum.html)`(``weight``)``,`\
+`    mean_km ``=`` `[`weighted.mean`](https://rspatial.github.io/terra/reference/weighted.mean.html)`(``cost``, ``weight``)`` ``/`` ``1000`\
+`  ``)`
 
     # A tibble: 5 × 4
       facility tracts population mean_km
@@ -208,10 +198,8 @@ any other attributes back on.
 
 You can access solution metadata through the `spopt` attribute:
 
-``` r
-
-attr(result_pmedian, "spopt")
-```
+\
+[`attr`](https://rdrr.io/r/base/attr.html)`(``result_pmedian``, ``"spopt"``)`
 
     $algorithm
     [1] "p_median"
@@ -241,7 +229,7 @@ attr(result_pmedian, "spopt")
     NULL
 
     $solve_time
-    [1] 0.514914
+    [1] 0.531492
 
 The `objective` value represents the total weighted distance - lower is
 better.
@@ -254,42 +242,40 @@ maximum distance any demand point must travel. This is critical for
 emergency services where we need to guarantee that *everyone* is within
 a reasonable distance.
 
-``` r
-
-result_pcenter <- p_center(
-  demand = demand_pts,
-  facilities = candidate_pts,
-  n_facilities = 5
-)
-
-selected_pcenter <- result_pcenter$facilities |>
-  filter(.selected)
-
-# Compare to P-Median locations
-maplibre(bounds = tarrant) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tarrant,
-    fill_color = "lightgray",
-    fill_opacity = 0.3
-  ) |>
-  add_circle_layer(
-    id = "pmedian",
-    source = selected,
-    circle_color = "#3498db",
-    circle_radius = 10,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  ) |>
-  add_circle_layer(
-    id = "pcenter",
-    source = selected_pcenter,
-    circle_color = "#e74c3c",
-    circle_radius = 5,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+`result_pcenter`` ``<-`` `[`p_center`](https://walker-data.com/spopt-r/reference/p_center.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_pts``,`\
+`  n_facilities ``=`` ``5`\
+`)`\
+\
+`selected_pcenter`` ``<-`` ``result_pcenter``$``facilities`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`\
+\
+`# Compare to P-Median locations`\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tarrant``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tarrant``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"pmedian"``,`\
+`    source ``=`` ``selected``,`\
+`    circle_color ``=`` ``"#3498db"``,`\
+`    circle_radius ``=`` ``10``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"pcenter"``,`\
+`    source ``=`` ``selected_pcenter``,`\
+`    circle_color ``=`` ``"#e74c3c"``,`\
+`    circle_radius ``=`` ``5``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 Notice how the P-Center solution (red) pushes facilities toward the
 edges of the county to ensure no one is too far away, while P-Median
@@ -304,29 +290,27 @@ radius when you can only build a fixed number of facilities. This is
 useful when you have budget constraints but want to cover as many people
 as possible.
 
-``` r
-
-result_mclp <- mclp(
-  demand = demand_pts,
-  facilities = candidate_pts,
-  n_facilities = 5,
-  service_radius = 5000,  # 5 km
-  weight_col = "population"
-)
-
-# Calculate coverage
-covered_pop <- result_mclp$demand |>
-  filter(.covered) |>
-  pull(population) |>
-  sum()
-
-total_pop <- sum(demand_pts$population, na.rm = TRUE)
-
-cat(sprintf("Coverage: %s of %s (%.1f%%)",
-            format(covered_pop, big.mark = ","),
-            format(total_pop, big.mark = ","),
-            100 * covered_pop / total_pop))
-```
+\
+`result_mclp`` ``<-`` `[`mclp`](https://walker-data.com/spopt-r/reference/mclp.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_pts``,`\
+`  n_facilities ``=`` ``5``,`\
+`  service_radius ``=`` ``5000``,  ``# 5 km`\
+`  weight_col ``=`` ``"population"`\
+`)`\
+\
+`# Calculate coverage`\
+`covered_pop`` ``<-`` ``result_mclp``$``demand`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.covered``)`` ``|>`\
+`  `[`pull`](https://dplyr.tidyverse.org/reference/pull.html)`(``population``)`` ``|>`\
+`  `[`sum`](https://rdrr.io/r/base/sum.html)`(``)`\
+\
+`total_pop`` ``<-`` `[`sum`](https://rdrr.io/r/base/sum.html)`(``demand_pts``$``population``, na.rm ``=`` ``TRUE``)`\
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Coverage: %s of %s (%.1f%%)"``,`\
+`            `[`format`](https://rdrr.io/r/base/format.html)`(``covered_pop``, big.mark ``=`` ``","``)``,`\
+`            `[`format`](https://rdrr.io/r/base/format.html)`(``total_pop``, big.mark ``=`` ``","``)``,`\
+`            ``100`` ``*`` ``covered_pop`` ``/`` ``total_pop``)``)`
 
     Coverage: 520,623 of 2,135,743 (24.4%)
 
@@ -341,42 +325,40 @@ so
 draws lines only for covered tracts. Uncovered tracts have no assignment
 and get no line:
 
-``` r
-
-mclp_lines <- spider_lines(result_mclp)
-
-uncovered <- result_mclp$demand |>
-  filter(!.covered)
-
-maplibre(bounds = tarrant) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tarrant,
-    fill_color = "lightgray",
-    fill_opacity = 0.3
-  ) |>
-  add_line_layer(
-    id = "covered",
-    source = mclp_lines,
-    line_color = "#2c7fb8",
-    line_width = 1
-  ) |>
-  add_circle_layer(
-    id = "uncovered",
-    source = uncovered,
-    circle_color = "#d7301f",
-    circle_radius = 3,
-    circle_opacity = 0.7
-  ) |>
-  add_circle_layer(
-    id = "facilities",
-    source = filter(result_mclp$facilities, .selected),
-    circle_color = "#2c7fb8",
-    circle_radius = 10,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+`mclp_lines`` ``<-`` `[`spider_lines`](https://walker-data.com/spopt-r/reference/spider_lines.md)`(``result_mclp``)`\
+\
+`uncovered`` ``<-`` ``result_mclp``$``demand`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``!``.covered``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tarrant``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tarrant``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"covered"``,`\
+`    source ``=`` ``mclp_lines``,`\
+`    line_color ``=`` ``"#2c7fb8"``,`\
+`    line_width ``=`` ``1`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"uncovered"``,`\
+`    source ``=`` ``uncovered``,`\
+`    circle_color ``=`` ``"#d7301f"``,`\
+`    circle_radius ``=`` ``3``,`\
+`    circle_opacity ``=`` ``0.7`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"facilities"``,`\
+`    source ``=`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``result_mclp``$``facilities``, ``.selected``)``,`\
+`    circle_color ``=`` ``"#2c7fb8"``,`\
+`    circle_radius ``=`` ``10``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 Red points are tracts outside the 5 km service radius of every selected
 facility.
@@ -388,17 +370,15 @@ The *Location Set Covering Problem* (LSCP) ([Toregas et al.
 the minimum number of facilities needed to cover *all* demand within a
 service radius?
 
-``` r
-
-result_lscp <- lscp(
-  demand = demand_pts,
-  facilities = candidate_pts,
-  service_radius = 8000  # 8 km
-)
-
-n_selected <- sum(result_lscp$facilities$.selected)
-cat(sprintf("Minimum facilities needed for full coverage: %d", n_selected))
-```
+\
+`result_lscp`` ``<-`` `[`lscp`](https://walker-data.com/spopt-r/reference/lscp.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_pts``,`\
+`  service_radius ``=`` ``8000``  ``# 8 km`\
+`)`\
+\
+`n_selected`` ``<-`` `[`sum`](https://rdrr.io/r/base/sum.html)`(``result_lscp``$``facilities``$``.selected``)`\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Minimum facilities needed for full coverage: %d"``, ``n_selected``)``)`
 
     Minimum facilities needed for full coverage: 19
 
@@ -418,32 +398,30 @@ minimum distance between facilities.
 P-Dispersion is also useful for environmental monitoring networks or
 cell tower placement where you want sensors spread across a region.
 
-``` r
-
-result_pdispersion <- p_dispersion(
-  facilities = candidate_pts,
-  n_facilities = 10
-)
-
-selected_disp <- result_pdispersion |>
-  filter(.selected)
-
-maplibre(bounds = tarrant) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tarrant,
-    fill_color = "lightgray",
-    fill_opacity = 0.3
-  ) |>
-  add_circle_layer(
-    id = "facilities",
-    source = selected_disp,
-    circle_color = "#2ecc71",
-    circle_radius = 10,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+`result_pdispersion`` ``<-`` `[`p_dispersion`](https://walker-data.com/spopt-r/reference/p_dispersion.md)`(`\
+`  facilities ``=`` ``candidate_pts``,`\
+`  n_facilities ``=`` ``10`\
+`)`\
+\
+`selected_disp`` ``<-`` ``result_pdispersion`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tarrant``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tarrant``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"facilities"``,`\
+`    source ``=`` ``selected_disp``,`\
+`    circle_color ``=`` ``"#2ecc71"``,`\
+`    circle_radius ``=`` ``10``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 Notice how the facilities are spread around the county’s perimeter and
 interior - maximizing the minimum inter-facility distance.
@@ -463,35 +441,33 @@ In practice, candidate sites often have different capacities based on
 lot size, zoning, or building constraints. Let’s simulate a realistic
 scenario with small, medium, and large sites:
 
-``` r
-
-# Create candidates with varying capacities
-set.seed(1983)
-candidate_facilities <- candidate_pts |>
-  mutate(
-    # Assign site sizes: small (200k), medium (400k), large (800k)
-    site_type = sample(c("small", "medium", "large"), n(), replace = TRUE),
-    capacity = case_when(
-      site_type == "small" ~ 200000,
-      site_type == "medium" ~ 400000,
-      site_type == "large" ~ 800000
-    )
-  )
-
-result_cflp <- cflp(
-  demand = demand_pts,
-  facilities = candidate_facilities,
-  n_facilities = 5,
-  weight_col = "population",
-  capacity_col = "capacity"
-)
-
-# Check which sites were selected and their utilization
-result_cflp$facilities |>
-  filter(.selected) |>
-  st_drop_geometry() |>
-  select(id, site_type, capacity, .utilization)
-```
+\
+`# Create candidates with varying capacities`\
+[`set.seed`](https://rdrr.io/r/base/Random.html)`(``1983``)`\
+`candidate_facilities`` ``<-`` ``candidate_pts`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`    ``# Assign site sizes: small (200k), medium (400k), large (800k)`\
+`    site_type ``=`` `[`sample`](https://rdrr.io/r/base/sample.html)`(`[`c`](https://rdrr.io/r/base/c.html)`(``"small"``, ``"medium"``, ``"large"``)``, `[`n`](https://dplyr.tidyverse.org/reference/context.html)`(``)``, replace ``=`` ``TRUE``)``,`\
+`    capacity ``=`` `[`case_when`](https://dplyr.tidyverse.org/reference/case-and-replace-when.html)`(`\
+`      ``site_type`` ``==`` ``"small"`` ``~`` ``200000``,`\
+`      ``site_type`` ``==`` ``"medium"`` ``~`` ``400000``,`\
+`      ``site_type`` ``==`` ``"large"`` ``~`` ``800000`\
+`    ``)`\
+`  ``)`\
+\
+`result_cflp`` ``<-`` `[`cflp`](https://walker-data.com/spopt-r/reference/cflp.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_facilities``,`\
+`  n_facilities ``=`` ``5``,`\
+`  weight_col ``=`` ``"population"``,`\
+`  capacity_col ``=`` ``"capacity"`\
+`)`\
+\
+`# Check which sites were selected and their utilization`\
+`result_cflp``$``facilities`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`` ``|>`\
+`  `[`st_drop_geometry`](https://r-spatial.github.io/sf/reference/st_geometry.html)`(``)`` ``|>`\
+`  `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``id``, ``site_type``, ``capacity``, ``.utilization``)`
 
       id site_type capacity .utilization
     1  5    medium    4e+05    0.9712625
@@ -507,13 +483,11 @@ fraction of each facility’s capacity is used.
 When demand exceeds capacity at the nearest facility, the solver splits
 demand across multiple facilities:
 
-``` r
-
-# How many demand points are split?
-n_split <- sum(result_cflp$demand$.split)
-cat(sprintf("%d of %d demand points are served by multiple facilities",
-            n_split, nrow(demand_pts)))
-```
+\
+`# How many demand points are split?`\
+`n_split`` ``<-`` `[`sum`](https://rdrr.io/r/base/sum.html)`(``result_cflp``$``demand``$``.split``)`\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"%d of %d demand points are served by multiple facilities"``,`\
+`            ``n_split``, `[`nrow`](https://rspatial.github.io/terra/reference/dimensions.html)`(``demand_pts``)``)``)`
 
     2 of 448 demand points are served by multiple facilities
 
@@ -525,45 +499,43 @@ allocation, so a split demand point gets one line per facility. The
 `share` column gives the fraction of that point’s demand sent along each
 line, and `weight` gives the population it carries:
 
-``` r
-
-cflp_lines <- spider_lines(result_cflp, allocations = "all") |>
-  mutate(split = if_else(demand_index %in% which(result_cflp$demand$.split),
-                         "split", "single"))
-
-maplibre(bounds = tarrant) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tarrant,
-    fill_color = "lightgray",
-    fill_opacity = 0.3
-  ) |>
-  add_line_layer(
-    id = "single",
-    source = filter(cflp_lines, split == "single"),
-    line_color = "#969696",
-    line_width = 0.75,
-    line_opacity = 0.5
-  ) |>
-  add_line_layer(
-    id = "split",
-    source = filter(cflp_lines, split == "split"),
-    line_color = "#d7301f",
-    line_width = interpolate(
-      column = "share",
-      values = c(0, 1),
-      stops = c(1.5, 5)
-    )
-  ) |>
-  add_circle_layer(
-    id = "facilities",
-    source = filter(result_cflp$facilities, .selected),
-    circle_color = "black",
-    circle_radius = 8,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+`cflp_lines`` ``<-`` `[`spider_lines`](https://walker-data.com/spopt-r/reference/spider_lines.md)`(``result_cflp``, allocations ``=`` ``"all"``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``split ``=`` `[`if_else`](https://dplyr.tidyverse.org/reference/if_else.html)`(``demand_index`` `[`%in%`](https://rspatial.github.io/terra/reference/match.html)` `[`which`](https://rdrr.io/r/base/which.html)`(``result_cflp``$``demand``$``.split``)``,`\
+`                         ``"split"``, ``"single"``)``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tarrant``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tarrant``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"single"``,`\
+`    source ``=`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``cflp_lines``, ``split`` ``==`` ``"single"``)``,`\
+`    line_color ``=`` ``"#969696"``,`\
+`    line_width ``=`` ``0.75``,`\
+`    line_opacity ``=`` ``0.5`\
+`  ``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"split"``,`\
+`    source ``=`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``cflp_lines``, ``split`` ``==`` ``"split"``)``,`\
+`    line_color ``=`` ``"#d7301f"``,`\
+`    line_width ``=`` ``interpolate``(`\
+`      column ``=`` ``"share"``,`\
+`      values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``0``, ``1``)``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``1.5``, ``5``)`\
+`    ``)`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"facilities"``,`\
+`    source ``=`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``result_cflp``$``facilities``, ``.selected``)``,`\
+`    circle_color ``=`` ``"black"``,`\
+`    circle_radius ``=`` ``8``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 Red lines belong to demand points split across facilities, with line
 width showing the share of demand sent along each line. Gray lines are
@@ -581,33 +553,31 @@ costs (opening facilities) against variable costs (transportation
 distance). The key is scaling costs appropriately - fixed costs should
 be comparable to total transportation costs:
 
-``` r
-
-# Add costs based on site size
-# Scale to be comparable with total transport costs (population * distance)
-candidate_with_costs <- candidate_facilities |>
-  mutate(
-    # Fixed cost to open each facility (scaled to match transport cost units)
-    fixed_cost = case_when(
-      site_type == "small" ~ 5e8,   # Higher cost per unit capacity
-      site_type == "medium" ~ 8e8,
-      site_type == "large" ~ 1e9
-    )
-  )
-
-result_with_costs <- cflp(
-  demand = demand_pts,
-  facilities = candidate_with_costs,
-  n_facilities = 0,  # Let solver determine optimal number
-  weight_col = "population",
-  capacity_col = "capacity",
-  facility_cost_col = "fixed_cost"
-)
-
-# How many facilities does the cost-optimized solution select?
-cost_meta <- attr(result_with_costs, "spopt")
-cat(sprintf("Optimal number of facilities: %d\n", cost_meta$n_selected))
-```
+\
+`# Add costs based on site size`\
+`# Scale to be comparable with total transport costs (population * distance)`\
+`candidate_with_costs`` ``<-`` ``candidate_facilities`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`    ``# Fixed cost to open each facility (scaled to match transport cost units)`\
+`    fixed_cost ``=`` `[`case_when`](https://dplyr.tidyverse.org/reference/case-and-replace-when.html)`(`\
+`      ``site_type`` ``==`` ``"small"`` ``~`` ``5e8``,   ``# Higher cost per unit capacity`\
+`      ``site_type`` ``==`` ``"medium"`` ``~`` ``8e8``,`\
+`      ``site_type`` ``==`` ``"large"`` ``~`` ``1e9`\
+`    ``)`\
+`  ``)`\
+\
+`result_with_costs`` ``<-`` `[`cflp`](https://walker-data.com/spopt-r/reference/cflp.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_with_costs``,`\
+`  n_facilities ``=`` ``0``,  ``# Let solver determine optimal number`\
+`  weight_col ``=`` ``"population"``,`\
+`  capacity_col ``=`` ``"capacity"``,`\
+`  facility_cost_col ``=`` ``"fixed_cost"`\
+`)`\
+\
+`# How many facilities does the cost-optimized solution select?`\
+`cost_meta`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result_with_costs``, ``"spopt"``)`\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Optimal number of facilities: %d\n"``, ``cost_meta``$``n_selected``)``)`
 
     Optimal number of facilities: 9
 
@@ -621,57 +591,53 @@ Real estate prices typically vary spatially - central locations cost
 more than peripheral ones. Let’s create a realistic scenario where costs
 increase toward the county centroid:
 
-``` r
-
-# Calculate distance from county centroid (proxy for "centrality")
-county_centroid <- st_centroid(county_boundary)
-
-# Compute distances to center
-dist_to_center <- as.numeric(st_distance(candidate_facilities, county_centroid))
-
-candidate_with_realestate <- candidate_facilities |>
-  mutate(
-    dist_to_center = dist_to_center,
-    # Costs higher near center, lower at periphery
-    # Normalize to 0-1 range and invert (closer = higher cost)
-    centrality = 1 - (dist_to_center - min(dist_to_center)) /
-                     (max(dist_to_center) - min(dist_to_center)),
-    # Cost ranges from $200-$500 per sqft based on location
-    cost_per_sqft = 200 + centrality * 300,
-    sqft = capacity / 10,  # Assume 10 people per sqft capacity
-    # Scale fixed cost to be comparable with transport costs
-    fixed_cost = sqft * cost_per_sqft * 50
-  )
-```
+\
+`# Calculate distance from county centroid (proxy for "centrality")`\
+`county_centroid`` ``<-`` `[`st_centroid`](https://r-spatial.github.io/sf/reference/geos_unary.html)`(``county_boundary``)`\
+\
+`# Compute distances to center`\
+`dist_to_center`` ``<-`` `[`as.numeric`](https://rdrr.io/r/base/numeric.html)`(`[`st_distance`](https://r-spatial.github.io/sf/reference/geos_measures.html)`(``candidate_facilities``, ``county_centroid``)``)`\
+\
+`candidate_with_realestate`` ``<-`` ``candidate_facilities`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`    dist_to_center ``=`` ``dist_to_center``,`\
+`    ``# Costs higher near center, lower at periphery`\
+`    ``# Normalize to 0-1 range and invert (closer = higher cost)`\
+`    centrality ``=`` ``1`` ``-`` ``(``dist_to_center`` ``-`` `[`min`](https://rdrr.io/r/base/Extremes.html)`(``dist_to_center``)``)`` ``/`\
+`                     ``(`[`max`](https://rdrr.io/r/base/Extremes.html)`(``dist_to_center``)`` ``-`` `[`min`](https://rdrr.io/r/base/Extremes.html)`(``dist_to_center``)``)``,`\
+`    ``# Cost ranges from $200-$500 per sqft based on location`\
+`    cost_per_sqft ``=`` ``200`` ``+`` ``centrality`` ``*`` ``300``,`\
+`    sqft ``=`` ``capacity`` ``/`` ``10``,  ``# Assume 10 people per sqft capacity`\
+`    ``# Scale fixed cost to be comparable with transport costs`\
+`    fixed_cost ``=`` ``sqft`` ``*`` ``cost_per_sqft`` ``*`` ``50`\
+`  ``)`
 
 Let’s visualize how costs vary across the county:
 
-``` r
-
-maplibre(bounds = tarrant) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tarrant,
-    fill_color = "lightgray",
-    fill_opacity = 0.3
-  ) |>
-  add_circle_layer(
-    id = "candidates",
-    source = candidate_with_realestate,
-    circle_color = interpolate(
-      column = "cost_per_sqft",
-      values = c(200, 350, 500),
-      stops = c("#2166ac", "#f7f7f7", "#b2182b")
-    ),
-    circle_radius = interpolate(
-      column = "capacity",
-      values = c(200000, 500000, 800000),
-      stops = c(6, 10, 14)
-    ),
-    circle_stroke_color = "white",
-    circle_stroke_width = 1
-  )
-```
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tarrant``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tarrant``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"candidates"``,`\
+`    source ``=`` ``candidate_with_realestate``,`\
+`    circle_color ``=`` ``interpolate``(`\
+`      column ``=`` ``"cost_per_sqft"``,`\
+`      values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``200``, ``350``, ``500``)``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#2166ac"``, ``"#f7f7f7"``, ``"#b2182b"``)`\
+`    ``)``,`\
+`    circle_radius ``=`` ``interpolate``(`\
+`      column ``=`` ``"capacity"``,`\
+`      values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``200000``, ``500000``, ``800000``)``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``6``, ``10``, ``14``)`\
+`    ``)``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``1`\
+`  ``)`
 
 Red sites are expensive (central), blue sites are cheaper (peripheral).
 Larger circles indicate higher capacity.
@@ -679,63 +645,59 @@ Larger circles indicate higher capacity.
 Now let’s compare two solutions: one ignoring costs (P-Median) and one
 incorporating real estate costs:
 
-``` r
+\
+`# Solution ignoring costs (just minimize distance)`\
+`result_no_cost`` ``<-`` `[`p_median`](https://walker-data.com/spopt-r/reference/p_median.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_with_realestate``,`\
+`  n_facilities ``=`` ``5``,`\
+`  weight_col ``=`` ``"population"`\
+`)`\
+\
+`# Solution with real estate costs`\
+`result_with_realestate`` ``<-`` `[`cflp`](https://walker-data.com/spopt-r/reference/cflp.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_with_realestate``,`\
+`  n_facilities ``=`` ``5``,`\
+`  weight_col ``=`` ``"population"``,`\
+`  capacity_col ``=`` ``"capacity"``,`\
+`  facility_cost_col ``=`` ``"fixed_cost"`\
+`)`\
+\
+`# Compare selections`\
+`selected_no_cost`` ``<-`` ``result_no_cost``$``facilities`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``method ``=`` ``"Distance only"``)`\
+\
+`selected_with_cost`` ``<-`` ``result_with_realestate``$``facilities`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``method ``=`` ``"With real estate costs"``)`
 
-# Solution ignoring costs (just minimize distance)
-result_no_cost <- p_median(
-  demand = demand_pts,
-  facilities = candidate_with_realestate,
-  n_facilities = 5,
-  weight_col = "population"
-)
-
-# Solution with real estate costs
-result_with_realestate <- cflp(
-  demand = demand_pts,
-  facilities = candidate_with_realestate,
-  n_facilities = 5,
-  weight_col = "population",
-  capacity_col = "capacity",
-  facility_cost_col = "fixed_cost"
-)
-
-# Compare selections
-selected_no_cost <- result_no_cost$facilities |>
-  filter(.selected) |>
-  mutate(method = "Distance only")
-
-selected_with_cost <- result_with_realestate$facilities |>
-  filter(.selected) |>
-  mutate(method = "With real estate costs")
-```
-
-``` r
-
-# Side-by-side comparison
-maplibre(bounds = tarrant) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tarrant,
-    fill_color = "lightgray",
-    fill_opacity = 0.3
-  ) |>
-  add_circle_layer(
-    id = "no_cost",
-    source = selected_no_cost,
-    circle_color = "#e41a1c",
-    circle_radius = 12,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  ) |>
-  add_circle_layer(
-    id = "with_cost",
-    source = selected_with_cost,
-    circle_color = "#377eb8",
-    circle_radius = 7,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  )
-```
+\
+`# Side-by-side comparison`\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tarrant``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tarrant``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.3`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"no_cost"``,`\
+`    source ``=`` ``selected_no_cost``,`\
+`    circle_color ``=`` ``"#e41a1c"``,`\
+`    circle_radius ``=`` ``12``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"with_cost"``,`\
+`    source ``=`` ``selected_with_cost``,`\
+`    circle_color ``=`` ``"#377eb8"``,`\
+`    circle_radius ``=`` ``7``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`
 
 Red circles show the distance-only solution (P-Median), blue circles
 show the cost-aware solution. Notice how the cost-aware solution may
@@ -789,19 +751,17 @@ Matrices](https://walker-data.com/spopt-r/articles/travel-time-matrices.md)
 vignette for how to generate travel time matrices using r5r, and then
 pass them to these functions.
 
-``` r
-
-# Example with custom cost matrix
-cost_mat <- my_travel_time_matrix  # Generated from r5r or similar
-
-result <- p_median(
-  demand = demand_pts,
-  facilities = candidate_pts,
-  n_facilities = 5,
-  weight_col = "population",
-  cost_matrix = cost_mat
-)
-```
+\
+`# Example with custom cost matrix`\
+`cost_mat`` ``<-`` ``my_travel_time_matrix``  ``# Generated from r5r or similar`\
+\
+`result`` ``<-`` `[`p_median`](https://walker-data.com/spopt-r/reference/p_median.md)`(`\
+`  demand ``=`` ``demand_pts``,`\
+`  facilities ``=`` ``candidate_pts``,`\
+`  n_facilities ``=`` ``5``,`\
+`  weight_col ``=`` ``"population"``,`\
+`  cost_matrix ``=`` ``cost_mat`\
+`)`
 
 ## Next steps
 

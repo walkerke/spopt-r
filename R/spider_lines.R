@@ -35,6 +35,10 @@
 #'   with a known CRS. Return an empty geometry for a pair that cannot be
 #'   routed; those links fall back to straight lines. [r5r_route_fun()]
 #'   builds such a function from an r5r network.
+#' @param facilities Optional integer row indices of `result$facilities` (or
+#'   `result$stores`) to draw links for. Other facilities' links are skipped
+#'   before any geometry is built, so drawing one store's trade area from a
+#'   large [huff()] result stays fast.
 #'
 #' @return An sf object in the CRS of `result$demand`, one row per link, with
 #'   columns:
@@ -109,7 +113,8 @@ spider_lines <- function(result,
                          min_share = 0,
                          cost_matrix = NULL,
                          anchor = c("centroid", "point_on_surface"),
-                         route_fun = NULL) {
+                         route_fun = NULL,
+                         facilities = NULL) {
   allocations <- match.arg(allocations)
   anchor <- match.arg(anchor)
 
@@ -122,7 +127,7 @@ spider_lines <- function(result,
   }
   is_huff <- inherits(result, "spopt_huff")
   demand <- result$demand
-  facilities <- if (is_huff) result$stores else result$facilities
+  fac_tbl <- if (is_huff) result$stores else result$facilities
   meta <- attr(result, "spopt")
   if (is.null(meta)) meta <- list()
   algorithm <- if (!is.null(meta$algorithm)) meta$algorithm else class(result)[1]
@@ -138,7 +143,7 @@ spider_lines <- function(result,
   }
 
   n_demand <- nrow(demand)
-  n_fac <- nrow(facilities)
+  n_fac <- nrow(fac_tbl)
 
   if (!is.null(cost_matrix)) {
     cost_matrix <- as.matrix(cost_matrix)
@@ -150,19 +155,29 @@ spider_lines <- function(result,
     }
   }
 
+  if (!is.null(facilities)) {
+    if (!is.numeric(facilities) || anyNA(facilities) ||
+        any(facilities != round(facilities)) ||
+        any(facilities < 1 | facilities > n_fac)) {
+      stop(sprintf("`facilities` must be row indices between 1 and %d", n_fac),
+           call. = FALSE)
+    }
+    facilities <- sort(unique(as.integer(facilities)))
+  }
+
   if (!is.null(route_fun) && !is.function(route_fun)) {
     stop("`route_fun` must be a function or NULL", call. = FALSE)
   }
 
   # CRS handling
   crs <- sf::st_crs(demand)
-  crs_fac <- sf::st_crs(facilities)
+  crs_fac <- sf::st_crs(fac_tbl)
   if (is.na(crs) != is.na(crs_fac)) {
     stop("`demand` and `facilities` must both have a CRS or both lack one",
          call. = FALSE)
   }
   if (!is.na(crs) && crs != crs_fac) {
-    facilities <- sf::st_transform(facilities, crs)
+    fac_tbl <- sf::st_transform(fac_tbl, crs)
   }
   if (is.na(crs) && !is.null(route_fun)) {
     stop("`route_fun` requires `demand` and `facilities` to have a known CRS",
@@ -171,12 +186,12 @@ spider_lines <- function(result,
 
   # Demand-facility pairs
   pr <- .spider_pairs(result, demand, n_fac, algorithm, is_huff, meta,
-                      allocations, min_share)
+                      allocations, min_share, facilities)
   pairs <- pr$pairs
 
   # Endpoints
   d_pts <- .spider_anchor(demand, anchor)
-  f_pts <- .spider_anchor(facilities, anchor)
+  f_pts <- .spider_anchor(fac_tbl, anchor)
   d_xy <- .spider_coords(d_pts)
   f_xy <- .spider_coords(f_pts)
 
@@ -255,6 +270,7 @@ spider_lines <- function(result,
     algorithm = algorithm,
     allocations = allocations,
     min_share = min_share,
+    facilities = facilities,
     n_lines = n_links,
     n_unassigned = pr$n_unassigned,
     n_filtered = pr$n_filtered,
@@ -269,7 +285,7 @@ spider_lines <- function(result,
 
 # Build the table of demand-facility links: d, f, share, primary
 .spider_pairs <- function(result, demand, n_fac, algorithm, is_huff, meta,
-                          allocations, min_share) {
+                          allocations, min_share, facilities = NULL) {
   tol <- 1e-6
 
   assign <- if (is_huff) demand$.primary_store else demand$.facility
@@ -305,7 +321,11 @@ spider_lines <- function(result,
   threshold <- if (is_huff) 0 else tol
 
   if (allocations == "all" && !is.null(share_matrix)) {
-    idx <- which(share_matrix > threshold, arr.ind = TRUE)
+    # Restrict to the requested facilities before searching for links
+    cols <- seq_len(ncol(share_matrix))
+    if (!is.null(facilities)) cols <- facilities[facilities <= ncol(share_matrix)]
+    idx <- which(share_matrix[, cols, drop = FALSE] > threshold, arr.ind = TRUE)
+    idx[, 2] <- cols[idx[, 2]]
     in_bounds <- idx[, 1] <= nrow(demand) & idx[, 2] <= n_fac
     if (any(!in_bounds)) {
       warning(sprintf(
@@ -333,6 +353,13 @@ spider_lines <- function(result,
       rep(1, length(d))
     }
     primary <- rep(TRUE, length(d))
+    if (!is.null(facilities)) {
+      wanted <- f %in% facilities
+      d <- d[wanted]
+      f <- f[wanted]
+      share <- share[wanted]
+      primary <- primary[wanted]
+    }
     if (!is.null(share_matrix)) {
       real <- share > threshold
       d <- d[real]

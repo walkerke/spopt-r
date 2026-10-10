@@ -29,24 +29,22 @@ Let’s work through a realistic scenario: a delivery station in west Fort
 Worth dispatching drivers to 25 residential addresses across Fort Worth,
 Benbrook, and Aledo.
 
-``` r
-
-library(spopt)
-library(tidyverse)
-library(sf)
-library(mapgl)
-
-# Load the bundled delivery data
-data(delivery_data)
-
-stops <- delivery_data$stops
-ttm <- delivery_data$matrix
-
-# Take a look at what we have
-stops |>
-  st_drop_geometry() |>
-  select(id, address, packages)
-```
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`spopt`](https://walker-data.com/spopt-r/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidyverse`](https://tidyverse.tidyverse.org)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`sf`](https://r-spatial.github.io/sf/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`mapgl`](https://walker-data.com/mapgl/)`)`\
+\
+`# Load the bundled delivery data`\
+[`data`](https://rdrr.io/r/utils/data.html)`(``delivery_data``)`\
+\
+`stops`` ``<-`` ``delivery_data``$``stops`\
+`ttm`` ``<-`` ``delivery_data``$``matrix`\
+\
+`# Take a look at what we have`\
+`stops`` ``|>`\
+`  `[`st_drop_geometry`](https://r-spatial.github.io/sf/reference/st_geometry.html)`(``)`` ``|>`\
+`  `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``id``, ``address``, ``packages``)`
 
     # A tibble: 26 × 3
        id    address                                    packages
@@ -69,32 +67,30 @@ Parker counties. Each stop has a package count, and `ttm` is a 26x26
 travel-time matrix in minutes computed with r5r from an OpenStreetMap
 road network.
 
-``` r
-
-# Depot is the first row
-depot <- stops |> filter(id == "depot")
-deliveries <- stops |> filter(id != "depot")
-
-maplibre(style = openfreemap_style("bright"), bounds = stops) |>
-  add_circle_layer(
-    id = "deliveries",
-    source = deliveries,
-    circle_color = "steelblue",
-    circle_radius = 6,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2,
-    tooltip = "address"
-  ) |>
-  add_circle_layer(
-    id = "depot",
-    source = depot,
-    circle_color = "#e41a1c",
-    circle_radius = 10,
-    circle_stroke_color = "white",
-    circle_stroke_width = 3,
-    tooltip = "address"
-  )
-```
+\
+`# Depot is the first row`\
+`depot`` ``<-`` ``stops`` ``|>`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``id`` ``==`` ``"depot"``)`\
+`deliveries`` ``<-`` ``stops`` ``|>`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``id`` ``!=`` ``"depot"``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``style ``=`` `[`openfreemap_style`](https://walker-data.com/mapgl/reference/openfreemap_style.html)`(``"bright"``)``, bounds ``=`` ``stops``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"deliveries"``,`\
+`    source ``=`` ``deliveries``,`\
+`    circle_color ``=`` ``"steelblue"``,`\
+`    circle_radius ``=`` ``6``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2``,`\
+`    tooltip ``=`` ``"address"`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"depot"``,`\
+`    source ``=`` ``depot``,`\
+`    circle_color ``=`` ``"#e41a1c"``,`\
+`    circle_radius ``=`` ``10``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``3``,`\
+`    tooltip ``=`` ``"address"`\
+`  ``)`
 
 The red marker is the depot (Amazon DDA9 on San Jacinto Dr). Blue
 markers are delivery stops spread from central Fort Worth west into
@@ -109,40 +105,38 @@ The key difference for routing is that you need a **square** matrix -
 every stop to every other stop - rather than the rectangular
 demand-to-facility matrix used in facility location.
 
-``` r
-
-# How the matrix was generated (requires Java 21 + OSM data)
-library(r5r)
-options(java.parameters = "-Xmx4G")
-rJavaEnv::java_quick_install(version = 21)
-
-r5r_core <- build_network(data_path = "path/to/osm/directory")
-
-# Prepare points for r5r
-r5r_pts <- stops |>
-  st_coordinates() |>
-  as_tibble() |>
-  rename(lon = X, lat = Y) |>
-  mutate(id = stops$id)
-
-# Square matrix: all stops to all stops
-ttm_long <- travel_time_matrix(
-  r5r_core,
-  origins = r5r_pts,
-  destinations = r5r_pts,
-  mode = "CAR",
-  departure_datetime = as.POSIXct("2025-03-15 08:00:00"),
-  max_trip_duration = 120
-)
-
-# Reshape to matrix
-ttm <- ttm_long |>
-  select(from_id, to_id, travel_time_p50) |>
-  pivot_wider(names_from = to_id, values_from = travel_time_p50) |>
-  arrange(match(from_id, stops$id)) |>
-  select(-from_id) |>
-  as.matrix()
-```
+\
+`# How the matrix was generated (requires Java 21 + OSM data)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`r5r`](https://github.com/ipeaGIT/r5r)`)`\
+[`options`](https://rdrr.io/r/base/options.html)`(``java.parameters ``=`` ``"-Xmx4G"``)`\
+`rJavaEnv``::`[`java_quick_install`](https://www.ekotov.pro/rJavaEnv/reference/java_quick_install.html)`(``version ``=`` ``21``)`\
+\
+`r5r_core`` ``<-`` `[`build_network`](https://ipeagit.github.io/r5r/reference/build_network.html)`(``data_path ``=`` ``"path/to/osm/directory"``)`\
+\
+`# Prepare points for r5r`\
+`r5r_pts`` ``<-`` ``stops`` ``|>`\
+`  `[`st_coordinates`](https://r-spatial.github.io/sf/reference/st_coordinates.html)`(``)`` ``|>`\
+`  `[`as_tibble`](https://tibble.tidyverse.org/reference/as_tibble.html)`(``)`` ``|>`\
+`  `[`rename`](https://dplyr.tidyverse.org/reference/rename.html)`(``lon ``=`` ``X``, lat ``=`` ``Y``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``id ``=`` ``stops``$``id``)`\
+\
+`# Square matrix: all stops to all stops`\
+`ttm_long`` ``<-`` `[`travel_time_matrix`](https://ipeagit.github.io/r5r/reference/travel_time_matrix.html)`(`\
+`  ``r5r_core``,`\
+`  origins ``=`` ``r5r_pts``,`\
+`  destinations ``=`` ``r5r_pts``,`\
+`  mode ``=`` ``"CAR"``,`\
+`  departure_datetime ``=`` `[`as.POSIXct`](https://rdrr.io/r/base/as.POSIXlt.html)`(``"2025-03-15 08:00:00"``)``,`\
+`  max_trip_duration ``=`` ``120`\
+`)`\
+\
+`# Reshape to matrix`\
+`ttm`` ``<-`` ``ttm_long`` ``|>`\
+`  `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``from_id``, ``to_id``, ``travel_time_p50``)`` ``|>`\
+`  `[`pivot_wider`](https://tidyr.tidyverse.org/reference/pivot_wider.html)`(``names_from ``=`` ``to_id``, values_from ``=`` ``travel_time_p50``)`` ``|>`\
+`  `[`arrange`](https://dplyr.tidyverse.org/reference/arrange.html)`(`[`match`](https://rspatial.github.io/terra/reference/match.html)`(``from_id``, ``stops``$``id``)``)`` ``|>`\
+`  `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``-``from_id``)`` ``|>`\
+`  `[`as.matrix`](https://rspatial.github.io/terra/reference/coerce.html)`(``)`
 
 Any routing engine that produces pairwise travel times works here; r5r
 is a great choice, but there are many others with R bindings, including
@@ -155,27 +149,21 @@ The simplest case: one driver, all 25 stops, return to the depot. The
 [`route_tsp()`](https://walker-data.com/spopt-r/reference/route_tsp.md)
 function finds the shortest sequence.
 
-``` r
-
-result <- route_tsp(stops, start = 1, cost_matrix = ttm)
-
-meta <- attr(result, "spopt")
-cat(sprintf("Optimized route: %.0f minutes\n", meta$total_cost))
-```
+\
+`result`` ``<-`` `[`route_tsp`](https://walker-data.com/spopt-r/reference/route_tsp.md)`(``stops``, start ``=`` ``1``, cost_matrix ``=`` ``ttm``)`\
+\
+`meta`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result``, ``"spopt"``)`\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Optimized route: %.0f minutes\n"``, ``meta``$``total_cost``)``)`
 
     Optimized route: 135 minutes
 
-``` r
-
-cat(sprintf("Nearest-neighbor baseline: %.0f minutes\n", meta$nn_cost))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Nearest-neighbor baseline: %.0f minutes\n"``, ``meta``$``nn_cost``)``)`
 
     Nearest-neighbor baseline: 150 minutes
 
-``` r
-
-cat(sprintf("Improvement: %.1f%%\n", meta$improvement_pct))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Improvement: %.1f%%\n"``, ``meta``$``improvement_pct``)``)`
 
     Improvement: 10.0%
 
@@ -187,14 +175,12 @@ remaining inefficiency.
 
 Let’s look at the visit order:
 
-``` r
-
-result |>
-  st_drop_geometry() |>
-  filter(.visit_order <= 10) |>
-  arrange(.visit_order) |>
-  select(id, address, .visit_order)
-```
+\
+`result`` ``|>`\
+`  `[`st_drop_geometry`](https://r-spatial.github.io/sf/reference/st_geometry.html)`(``)`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.visit_order`` ``<=`` ``10``)`` ``|>`\
+`  `[`arrange`](https://dplyr.tidyverse.org/reference/arrange.html)`(``.visit_order``)`` ``|>`\
+`  `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``id``, ``address``, ``.visit_order``)`
 
     # A tibble: 10 × 3
        id    address                                    .visit_order
@@ -215,51 +201,49 @@ together rather than bouncing back and forth. As the bundled
 `delivery_data` includes pre-computed route geometries from r5r, we can
 draw the actual driving paths:
 
-``` r
-
-tsp_route <- delivery_data$tsp_route
-
-# Number stops by visit order
-result_ordered <- result |>
-  filter(!is.na(.visit_order)) |>
-  mutate(label = as.character(.visit_order))
-
-maplibre(style = openfreemap_style("bright"), bounds = stops) |>
-  add_line_layer(
-    id = "route",
-    source = tsp_route,
-    line_color = "#2563eb",
-    line_width = 3,
-    line_opacity = 0.8
-  ) |>
-  add_circle_layer(
-    id = "stops",
-    source = result_ordered |> filter(id != "depot"),
-    circle_color = "#2563eb",
-    circle_radius = 7,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2,
-    tooltip = "address"
-  ) |>
-  add_symbol_layer(
-    id = "labels",
-    source = result_ordered |> filter(id != "depot"),
-    text_field = get_column("label"),
-    text_size = 11,
-    text_color = "white",
-    text_halo_color = "#1e40af",
-    text_halo_width = 1.5
-  ) |>
-  add_circle_layer(
-    id = "depot",
-    source = depot,
-    circle_color = "#dc2626",
-    circle_radius = 10,
-    circle_stroke_color = "white",
-    circle_stroke_width = 3,
-    tooltip = "address"
-  )
-```
+\
+`tsp_route`` ``<-`` ``delivery_data``$``tsp_route`\
+\
+`# Number stops by visit order`\
+`result_ordered`` ``<-`` ``result`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``!`[`is.na`](https://rdrr.io/r/base/NA.html)`(``.visit_order``)``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``label ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``.visit_order``)``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``style ``=`` `[`openfreemap_style`](https://walker-data.com/mapgl/reference/openfreemap_style.html)`(``"bright"``)``, bounds ``=`` ``stops``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"route"``,`\
+`    source ``=`` ``tsp_route``,`\
+`    line_color ``=`` ``"#2563eb"``,`\
+`    line_width ``=`` ``3``,`\
+`    line_opacity ``=`` ``0.8`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"stops"``,`\
+`    source ``=`` ``result_ordered`` ``|>`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``id`` ``!=`` ``"depot"``)``,`\
+`    circle_color ``=`` ``"#2563eb"``,`\
+`    circle_radius ``=`` ``7``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2``,`\
+`    tooltip ``=`` ``"address"`\
+`  ``)`` ``|>`\
+`  `[`add_symbol_layer`](https://walker-data.com/mapgl/reference/add_symbol_layer.html)`(`\
+`    id ``=`` ``"labels"``,`\
+`    source ``=`` ``result_ordered`` ``|>`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``id`` ``!=`` ``"depot"``)``,`\
+`    text_field ``=`` `[`get_column`](https://walker-data.com/mapgl/reference/get_column.html)`(``"label"``)``,`\
+`    text_size ``=`` ``11``,`\
+`    text_color ``=`` ``"white"``,`\
+`    text_halo_color ``=`` ``"#1e40af"``,`\
+`    text_halo_width ``=`` ``1.5`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"depot"``,`\
+`    source ``=`` ``depot``,`\
+`    circle_color ``=`` ``"#dc2626"``,`\
+`    circle_radius ``=`` ``10``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``3``,`\
+`    tooltip ``=`` ``"address"`\
+`  ``)`
 
 The route follows actual roads between stops. Notice the optimized route
 saves the far western stops (Aledo, Willow Park) for last before
@@ -271,28 +255,22 @@ Drivers don’t always return to the depot. A field technician might start
 at the office and end at their last appointment. Set `end = NULL` for an
 open route:
 
-``` r
-
-result_open <- route_tsp(stops, start = 1, end = NULL, cost_matrix = ttm)
-meta_open <- attr(result_open, "spopt")
-
-cat(sprintf("Closed route: %.0f minutes\n", meta$total_cost))
-```
+\
+`result_open`` ``<-`` `[`route_tsp`](https://walker-data.com/spopt-r/reference/route_tsp.md)`(``stops``, start ``=`` ``1``, end ``=`` ``NULL``, cost_matrix ``=`` ``ttm``)`\
+`meta_open`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result_open``, ``"spopt"``)`\
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Closed route: %.0f minutes\n"``, ``meta``$``total_cost``)``)`
 
     Closed route: 135 minutes
 
-``` r
-
-cat(sprintf("Open route:   %.0f minutes\n", meta_open$total_cost))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Open route:   %.0f minutes\n"``, ``meta_open``$``total_cost``)``)`
 
     Open route:   120 minutes
 
-``` r
-
-cat(sprintf("Saved by not returning: %.0f minutes\n",
-            meta$total_cost - meta_open$total_cost))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Saved by not returning: %.0f minutes\n"``,`\
+`            ``meta``$``total_cost`` ``-`` ``meta_open``$``total_cost``)``)`
 
     Saved by not returning: 15 minutes
 
@@ -305,23 +283,19 @@ Sometimes the start and end points are different - a courier picks up
 from a warehouse and must end at a specific drop-off location. Use
 `start` and `end` to fix both endpoints:
 
-``` r
-
-# Start at depot (1), end at the farthest delivery (index of a Parker County stop)
-parker_stop <- which(grepl("Willow Park|Hudson Oaks|Aledo", stops$address))[1]
-
-result_path <- route_tsp(stops, start = 1, end = parker_stop, cost_matrix = ttm)
-meta_path <- attr(result_path, "spopt")
-
-cat(sprintf("Route type: %s\n", meta_path$route_type))
-```
+\
+`# Start at depot (1), end at the farthest delivery (index of a Parker County stop)`\
+`parker_stop`` ``<-`` `[`which`](https://rdrr.io/r/base/which.html)`(`[`grepl`](https://rdrr.io/r/base/grep.html)`(``"Willow Park|Hudson Oaks|Aledo"``, ``stops``$``address``)``)``[``1``]`\
+\
+`result_path`` ``<-`` `[`route_tsp`](https://walker-data.com/spopt-r/reference/route_tsp.md)`(``stops``, start ``=`` ``1``, end ``=`` ``parker_stop``, cost_matrix ``=`` ``ttm``)`\
+`meta_path`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result_path``, ``"spopt"``)`\
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Route type: %s\n"``, ``meta_path``$``route_type``)``)`
 
     Route type: path
 
-``` r
-
-cat(sprintf("Total time: %.0f minutes\n", meta_path$total_cost))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Total time: %.0f minutes\n"``, ``meta_path``$``total_cost``)``)`
 
     Total time: 124 minutes
 
@@ -337,47 +311,37 @@ capacity constraints.
 Our stops have package counts ranging from 3 to 5. With a van capacity
 of 35 packages:
 
-``` r
-
-cat(sprintf("Total packages: %d\n", sum(stops$packages)))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Total packages: %d\n"``, `[`sum`](https://rdrr.io/r/base/sum.html)`(``stops``$``packages``)``)``)`
 
     Total packages: 98
 
-``` r
-
-cat(sprintf("Van capacity: 35\n"))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Van capacity: 35\n"``)``)`
 
     Van capacity: 35
 
-``` r
-
-cat(sprintf("Minimum vans needed: %d\n", ceiling(sum(stops$packages) / 35)))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Minimum vans needed: %d\n"``, `[`ceiling`](https://rdrr.io/r/base/Round.html)`(`[`sum`](https://rdrr.io/r/base/sum.html)`(``stops``$``packages``)`` ``/`` ``35``)``)``)`
 
     Minimum vans needed: 3
 
-``` r
-
-result_vrp <- route_vrp(
-  stops,
-  depot = 1,
-  demand_col = "packages",
-  vehicle_capacity = 35,
-  cost_matrix = ttm
-)
-
-meta_vrp <- attr(result_vrp, "spopt")
-cat(sprintf("Vehicles used: %d\n", meta_vrp$n_vehicles))
-```
+\
+`result_vrp`` ``<-`` `[`route_vrp`](https://walker-data.com/spopt-r/reference/route_vrp.md)`(`\
+`  ``stops``,`\
+`  depot ``=`` ``1``,`\
+`  demand_col ``=`` ``"packages"``,`\
+`  vehicle_capacity ``=`` ``35``,`\
+`  cost_matrix ``=`` ``ttm`\
+`)`\
+\
+`meta_vrp`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result_vrp``, ``"spopt"``)`\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Vehicles used: %d\n"``, ``meta_vrp``$``n_vehicles``)``)`
 
     Vehicles used: 3
 
-``` r
-
-cat(sprintf("Total drive time: %.0f minutes\n", meta_vrp$total_cost))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Total drive time: %.0f minutes\n"``, ``meta_vrp``$``total_cost``)``)`
 
     Total drive time: 167 minutes
 
@@ -386,10 +350,8 @@ construction, then improves with intra-route 2-opt and or-opt
 (resequencing stops within each route) and inter-route relocate and swap
 (moving stops between vehicles).
 
-``` r
-
-summary(result_vrp)
-```
+\
+[`summary`](https://rspatial.github.io/terra/reference/summary.html)`(``result_vrp``)`
 
     VRP routes: 26 locations, 3 vehicles (depot: 1)
       Method: 2-opt | Total cost: 167.0 | Improvement: 5.7%
@@ -407,53 +369,51 @@ summary(result_vrp)
 The bundled data includes road geometries for each vehicle’s route.
 Let’s see how the fleet covers the delivery area:
 
-``` r
-
-vrp_route <- delivery_data$vrp_route |>
-  mutate(vehicle = as.character(vehicle))
-
-vrp_stops <- result_vrp |>
-  filter(.vehicle > 0) |>
-  mutate(.vehicle = as.character(.vehicle))
-
-vehicle_colors <- c("#e41a1c", "#377eb8", "#4daf4a")
-vehicle_ids <- as.character(seq_len(meta_vrp$n_vehicles))
-
-maplibre(style = openfreemap_style("bright"), bounds = stops) |>
-  add_line_layer(
-    id = "routes",
-    source = vrp_route,
-    line_color = match_expr(
-      column = "vehicle",
-      values = vehicle_ids,
-      stops = vehicle_colors[seq_along(vehicle_ids)]
-    ),
-    line_width = 3,
-    line_opacity = 0.8
-  ) |>
-  add_circle_layer(
-    id = "stops",
-    source = vrp_stops,
-    circle_color = match_expr(
-      column = ".vehicle",
-      values = vehicle_ids,
-      stops = vehicle_colors[seq_along(vehicle_ids)]
-    ),
-    circle_radius = 7,
-    circle_stroke_color = "white",
-    circle_stroke_width = 2,
-    tooltip = "address"
-  ) |>
-  add_circle_layer(
-    id = "depot",
-    source = depot,
-    circle_color = "black",
-    circle_radius = 10,
-    circle_stroke_color = "white",
-    circle_stroke_width = 3,
-    tooltip = "address"
-  )
-```
+\
+`vrp_route`` ``<-`` ``delivery_data``$``vrp_route`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``vehicle ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``vehicle``)``)`\
+\
+`vrp_stops`` ``<-`` ``result_vrp`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.vehicle`` ``>`` ``0``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``.vehicle ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``.vehicle``)``)`\
+\
+`vehicle_colors`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#e41a1c"``, ``"#377eb8"``, ``"#4daf4a"``)`\
+`vehicle_ids`` ``<-`` `[`as.character`](https://rdrr.io/r/base/character.html)`(`[`seq_len`](https://rdrr.io/r/base/seq.html)`(``meta_vrp``$``n_vehicles``)``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``style ``=`` `[`openfreemap_style`](https://walker-data.com/mapgl/reference/openfreemap_style.html)`(``"bright"``)``, bounds ``=`` ``stops``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"routes"``,`\
+`    source ``=`` ``vrp_route``,`\
+`    line_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`      column ``=`` ``"vehicle"``,`\
+`      values ``=`` ``vehicle_ids``,`\
+`      stops ``=`` ``vehicle_colors``[`[`seq_along`](https://rdrr.io/r/base/seq.html)`(``vehicle_ids``)``]`\
+`    ``)``,`\
+`    line_width ``=`` ``3``,`\
+`    line_opacity ``=`` ``0.8`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"stops"``,`\
+`    source ``=`` ``vrp_stops``,`\
+`    circle_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`      column ``=`` ``".vehicle"``,`\
+`      values ``=`` ``vehicle_ids``,`\
+`      stops ``=`` ``vehicle_colors``[`[`seq_along`](https://rdrr.io/r/base/seq.html)`(``vehicle_ids``)``]`\
+`    ``)``,`\
+`    circle_radius ``=`` ``7``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2``,`\
+`    tooltip ``=`` ``"address"`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"depot"``,`\
+`    source ``=`` ``depot``,`\
+`    circle_color ``=`` ``"black"``,`\
+`    circle_radius ``=`` ``10``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``3``,`\
+`    tooltip ``=`` ``"address"`\
+`  ``)`
 
 Each color is a different van’s route, with all routes ending at the
 depot (the black marker). You can see how the three routes are
@@ -465,28 +425,24 @@ stops and the red driver the northern stops.
 
 If you have exactly 2 vans available, set `n_vehicles`:
 
-``` r
-
-result_2vans <- route_vrp(
-  stops,
-  depot = 1,
-  demand_col = "packages",
-  vehicle_capacity = 50,
-  n_vehicles = 2,
-  cost_matrix = ttm
-)
-
-meta_2 <- attr(result_2vans, "spopt")
-cat(sprintf("Vehicles: %d\n", meta_2$n_vehicles))
-```
+\
+`result_2vans`` ``<-`` `[`route_vrp`](https://walker-data.com/spopt-r/reference/route_vrp.md)`(`\
+`  ``stops``,`\
+`  depot ``=`` ``1``,`\
+`  demand_col ``=`` ``"packages"``,`\
+`  vehicle_capacity ``=`` ``50``,`\
+`  n_vehicles ``=`` ``2``,`\
+`  cost_matrix ``=`` ``ttm`\
+`)`\
+\
+`meta_2`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result_2vans``, ``"spopt"``)`\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Vehicles: %d\n"``, ``meta_2``$``n_vehicles``)``)`
 
     Vehicles: 2
 
-``` r
-
-cat(sprintf("Total time: %.0f min (vs %.0f min with %d vans)\n",
-            meta_2$total_cost, meta_vrp$total_cost, meta_vrp$n_vehicles))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Total time: %.0f min (vs %.0f min with %d vans)\n"``,`\
+`            ``meta_2``$``total_cost``, ``meta_vrp``$``total_cost``, ``meta_vrp``$``n_vehicles``)``)`
 
     Total time: 192 min (vs 167 min with 3 vans)
 
@@ -501,21 +457,19 @@ solver will split routes so that no vehicle exceeds the time budget. You
 can also account for time spent at each stop with `service_time` –
 loading/unloading, signatures, etc.
 
-``` r
-
-n <- nrow(stops)
-result_shift <- route_vrp(
-  stops,
-  depot = 1,
-  demand_col = "packages",
-  vehicle_capacity = 50,
-  cost_matrix = ttm,
-  service_time = rep(3, n),   # 3 minutes at each stop
-  max_route_time = 90         # 90-minute shift limit
-)
-
-summary(result_shift)
-```
+\
+`n`` ``<-`` `[`nrow`](https://rspatial.github.io/terra/reference/dimensions.html)`(``stops``)`\
+`result_shift`` ``<-`` `[`route_vrp`](https://walker-data.com/spopt-r/reference/route_vrp.md)`(`\
+`  ``stops``,`\
+`  depot ``=`` ``1``,`\
+`  demand_col ``=`` ``"packages"``,`\
+`  vehicle_capacity ``=`` ``50``,`\
+`  cost_matrix ``=`` ``ttm``,`\
+`  service_time ``=`` `[`rep`](https://rdrr.io/r/base/rep.html)`(``3``, ``n``)``,   ``# 3 minutes at each stop`\
+`  max_route_time ``=`` ``90``         ``# 90-minute shift limit`\
+`)`\
+\
+[`summary`](https://rspatial.github.io/terra/reference/summary.html)`(``result_shift``)`
 
     VRP routes: 26 locations, 3 vehicles (depot: 1)
       Method: 2-opt | Total cost: 162.0 | Improvement: 6.4%
@@ -543,20 +497,18 @@ another is out for 80. Setting `balance = "time"` runs a
 post-optimization phase that redistributes stops to reduce the longest
 route time, at the cost of a small bounded cost increase.
 
-``` r
-
-result_balanced <- route_vrp(
-  stops,
-  depot = 1,
-  demand_col = "packages",
-  vehicle_capacity = 35,
-  cost_matrix = ttm,
-  service_time = rep(3, n),
-  balance = "time"
-)
-
-summary(result_balanced)
-```
+\
+`result_balanced`` ``<-`` `[`route_vrp`](https://walker-data.com/spopt-r/reference/route_vrp.md)`(`\
+`  ``stops``,`\
+`  depot ``=`` ``1``,`\
+`  demand_col ``=`` ``"packages"``,`\
+`  vehicle_capacity ``=`` ``35``,`\
+`  cost_matrix ``=`` ``ttm``,`\
+`  service_time ``=`` `[`rep`](https://rdrr.io/r/base/rep.html)`(``3``, ``n``)``,`\
+`  balance ``=`` ``"time"`\
+`)`\
+\
+[`summary`](https://rspatial.github.io/terra/reference/summary.html)`(``result_balanced``)`
 
     VRP routes: 26 locations, 3 vehicles (depot: 1)
       Method: 2-opt | Total cost: 167.0 | Improvement: 5.7%
@@ -582,27 +534,25 @@ solver respects these when constructing and improving routes. A vehicle
 may arrive early and wait, but it cannot begin service after the
 `latest` time.
 
-``` r
-
-# Simulate availability windows: depot open all day, customers available
-# within a 30-minute window starting at staggered times
-set.seed(42)
-window_open <- c(0, runif(n - 1, 0, 40))   # depot at 0
-window_close <- c(200, window_open[-1] + 30) # 30-minute windows
-
-result_tw <- route_vrp(
-  stops,
-  depot = 1,
-  demand_col = "packages",
-  vehicle_capacity = 50,
-  cost_matrix = ttm,
-  service_time = rep(3, n),
-  earliest = window_open,
-  latest = window_close
-)
-
-summary(result_tw)
-```
+\
+`# Simulate availability windows: depot open all day, customers available`\
+`# within a 30-minute window starting at staggered times`\
+[`set.seed`](https://rdrr.io/r/base/Random.html)`(``42``)`\
+`window_open`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``0``, `[`runif`](https://rdrr.io/r/stats/Uniform.html)`(``n`` ``-`` ``1``, ``0``, ``40``)``)``   ``# depot at 0`\
+`window_close`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``200``, ``window_open``[``-``1``]`` ``+`` ``30``)`` ``# 30-minute windows`\
+\
+`result_tw`` ``<-`` `[`route_vrp`](https://walker-data.com/spopt-r/reference/route_vrp.md)`(`\
+`  ``stops``,`\
+`  depot ``=`` ``1``,`\
+`  demand_col ``=`` ``"packages"``,`\
+`  vehicle_capacity ``=`` ``50``,`\
+`  cost_matrix ``=`` ``ttm``,`\
+`  service_time ``=`` `[`rep`](https://rdrr.io/r/base/rep.html)`(``3``, ``n``)``,`\
+`  earliest ``=`` ``window_open``,`\
+`  latest ``=`` ``window_close`\
+`)`\
+\
+[`summary`](https://rspatial.github.io/terra/reference/summary.html)`(``result_tw``)`
 
     VRP routes: 26 locations, 6 vehicles (depot: 1)
       Method: 2-opt | Total cost: 229.0 | Improvement: 6.2%
@@ -641,49 +591,47 @@ of stops.
 
 Here’s how to do it with r5r:
 
-``` r
-
-library(r5r)
-
-# Prepare stop coordinates for r5r
-r5r_pts <- stops |>
-  st_coordinates() |>
-  as_tibble() |>
-  rename(lon = X, lat = Y) |>
-  mutate(id = stops$id)
-
-# Get road geometries for a sequence of stops
-get_route_legs <- function(tour_indices, r5r_core) {
-  map(seq_len(length(tour_indices) - 1), \(i) {
-    detailed_itineraries(
-      r5r_core,
-      origins = r5r_pts |> filter(id == stops$id[tour_indices[i]]),
-      destinations = r5r_pts |> filter(id == stops$id[tour_indices[i + 1]]),
-      mode = "CAR",
-      departure_datetime = as.POSIXct("2025-03-15 08:00:00"),
-      shortest_path = TRUE
-    )
-  }) |>
-    bind_rows()
-}
-
-# TSP: use the tour from metadata
-tsp_meta <- attr(result, "spopt")
-tsp_route <- get_route_legs(tsp_meta$tour, r5r_core)
-
-# VRP: build each vehicle's tour (depot -> stops -> depot)
-vrp_route <- seq_len(meta_vrp$n_vehicles) |>
-  map(\(v) {
-    vehicle_stops <- result_vrp |>
-      filter(.vehicle == v) |>
-      arrange(.visit_order)
-
-    vehicle_tour <- c(1, match(vehicle_stops$id, stops$id), 1)
-    get_route_legs(vehicle_tour, r5r_core) |>
-      mutate(vehicle = v)
-  }) |>
-  bind_rows()
-```
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`r5r`](https://github.com/ipeaGIT/r5r)`)`\
+\
+`# Prepare stop coordinates for r5r`\
+`r5r_pts`` ``<-`` ``stops`` ``|>`\
+`  `[`st_coordinates`](https://r-spatial.github.io/sf/reference/st_coordinates.html)`(``)`` ``|>`\
+`  `[`as_tibble`](https://tibble.tidyverse.org/reference/as_tibble.html)`(``)`` ``|>`\
+`  `[`rename`](https://dplyr.tidyverse.org/reference/rename.html)`(``lon ``=`` ``X``, lat ``=`` ``Y``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``id ``=`` ``stops``$``id``)`\
+\
+`# Get road geometries for a sequence of stops`\
+`get_route_legs`` ``<-`` ``function``(``tour_indices``, ``r5r_core``)`` ``{`\
+`  `[`map`](https://purrr.tidyverse.org/reference/map.html)`(`[`seq_len`](https://rdrr.io/r/base/seq.html)`(`[`length`](https://rdrr.io/r/base/length.html)`(``tour_indices``)`` ``-`` ``1``)``, \``(``i``)`` ``{`\
+`    `[`detailed_itineraries`](https://ipeagit.github.io/r5r/reference/detailed_itineraries.html)`(`\
+`      ``r5r_core``,`\
+`      origins ``=`` ``r5r_pts`` ``|>`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``id`` ``==`` ``stops``$``id``[``tour_indices``[``i``]``]``)``,`\
+`      destinations ``=`` ``r5r_pts`` ``|>`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``id`` ``==`` ``stops``$``id``[``tour_indices``[``i`` ``+`` ``1``]``]``)``,`\
+`      mode ``=`` ``"CAR"``,`\
+`      departure_datetime ``=`` `[`as.POSIXct`](https://rdrr.io/r/base/as.POSIXlt.html)`(``"2025-03-15 08:00:00"``)``,`\
+`      shortest_path ``=`` ``TRUE`\
+`    ``)`\
+`  ``}``)`` ``|>`\
+`    `[`bind_rows`](https://dplyr.tidyverse.org/reference/bind_rows.html)`(``)`\
+`}`\
+\
+`# TSP: use the tour from metadata`\
+`tsp_meta`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result``, ``"spopt"``)`\
+`tsp_route`` ``<-`` ``get_route_legs``(``tsp_meta``$``tour``, ``r5r_core``)`\
+\
+`# VRP: build each vehicle's tour (depot -> stops -> depot)`\
+`vrp_route`` ``<-`` `[`seq_len`](https://rdrr.io/r/base/seq.html)`(``meta_vrp``$``n_vehicles``)`` ``|>`\
+`  `[`map`](https://purrr.tidyverse.org/reference/map.html)`(``\``(``v``)`` ``{`\
+`    ``vehicle_stops`` ``<-`` ``result_vrp`` ``|>`\
+`      `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.vehicle`` ``==`` ``v``)`` ``|>`\
+`      `[`arrange`](https://dplyr.tidyverse.org/reference/arrange.html)`(``.visit_order``)`\
+\
+`    ``vehicle_tour`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``1``, `[`match`](https://rspatial.github.io/terra/reference/match.html)`(``vehicle_stops``$``id``, ``stops``$``id``)``, ``1``)`\
+`    ``get_route_legs``(``vehicle_tour``, ``r5r_core``)`` ``|>`\
+`      `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``vehicle ``=`` ``v``)`\
+`  ``}``)`` ``|>`\
+`  `[`bind_rows`](https://dplyr.tidyverse.org/reference/bind_rows.html)`(``)`
 
 The same pattern works with other routing engines. With OSRM
 ([`osrm::osrmRoute()`](https://riatelab.r-universe.dev/osrm/reference/osrmRoute.html)),

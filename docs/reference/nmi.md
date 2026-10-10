@@ -23,8 +23,8 @@ Numeric vector of normalized moments of inertia.
 
 ## Details
 
-The NMI is defined as follows, where \\A\\ is the area of a geometry,
-and \\I\\ is the second moment of inertia (i.e., the second areal
+The NMI is defined as follows, where \\(A\\) is the area of a geometry,
+and \\(I\\) is the second moment of inertia (i.e., the second areal
 moment): \$\$\frac{A^2}{2 \pi I}\$\$ See Li et al. (2013, 2014) for
 additional details.
 

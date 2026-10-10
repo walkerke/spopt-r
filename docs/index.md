@@ -10,17 +10,13 @@ solver for facility location.
 
 Install the official release from CRAN:
 
-``` r
-
-install.packages("spopt")
-```
+\
+[`install.packages`](https://rdrr.io/r/utils/install.packages.html)`(``"spopt"``)`
 
 Or, install the development version from r-universe:
 
-``` r
-
-install.packages('spopt', repos = c('https://walkerke.r-universe.dev', 'https://cloud.r-project.org'))
-```
+\
+[`install.packages`](https://rdrr.io/r/utils/install.packages.html)`(``'spopt'``, repos ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``'https://walkerke.r-universe.dev'``, ``'https://cloud.r-project.org'``)``)`
 
 For developers who need to build from source (requires Rust), see
 [CONTRIBUTING.md](https://github.com/walkerke/spopt-r/blob/main/CONTRIBUTING.md).

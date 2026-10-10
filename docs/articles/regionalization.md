@@ -33,38 +33,34 @@ County, Texas. We’ll use the tidycensus package to get population,
 median household income, and percentage with a bachelor’s degree -
 variables that might define meaningful neighborhood clusters.
 
-``` r
-
-library(spopt)
-library(tidycensus)
-library(tidyverse)
-library(sf)
-library(mapgl)
-
-dallas <- get_acs(
-  geography = "tract",
-  variables = c(
-    pop = "B01003_001",
-    income = "B19013_001",
-    bachelors = "DP02_0068P"
-  ),
-  state = "TX",
-  county = "Dallas",
-  geometry = TRUE,
-  year = 2023,
-  output = "wide"
-) |>
-  filter(!is.na(incomeE), !is.na(bachelorsE))
-```
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`spopt`](https://walker-data.com/spopt-r/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidycensus`](https://walker-data.com/tidycensus/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidyverse`](https://tidyverse.tidyverse.org)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`sf`](https://r-spatial.github.io/sf/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`mapgl`](https://walker-data.com/mapgl/)`)`\
+\
+`dallas`` ``<-`` `[`get_acs`](https://walker-data.com/tidycensus/reference/get_acs.html)`(`\
+`  geography ``=`` ``"tract"``,`\
+`  variables ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(`\
+`    pop ``=`` ``"B01003_001"``,`\
+`    income ``=`` ``"B19013_001"``,`\
+`    bachelors ``=`` ``"DP02_0068P"`\
+`  ``)``,`\
+`  state ``=`` ``"TX"``,`\
+`  county ``=`` ``"Dallas"``,`\
+`  geometry ``=`` ``TRUE``,`\
+`  year ``=`` ``2023``,`\
+`  output ``=`` ``"wide"`\
+`)`` ``|>`\
+`  `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``!`[`is.na`](https://rdrr.io/r/base/NA.html)`(``incomeE``)``, ``!`[`is.na`](https://rdrr.io/r/base/NA.html)`(``bachelorsE``)``)`
 
 We now have 642 Census tracts with population, income, and education
 data. Let’s take a quick look at the geographic distribution of median
 household income:
 
-``` r
-
-maplibre_view(dallas, column = "incomeE")
-```
+\
+[`maplibre_view`](https://walker-data.com/mapgl/reference/maplibre_view.html)`(``dallas``, column ``=`` ``"incomeE"``)`
 
 The map reveals the familiar spatial pattern of income inequality in
 Dallas - higher incomes concentrated in the Park Cities north of
@@ -82,19 +78,17 @@ efficiency ([Wei et al. 2021](#ref-wei2021)).
 
 Let’s create regions where each must contain at least 50,000 people:
 
-``` r
-
-maxp_result <- max_p_regions(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  threshold_var = "popE",
-  threshold = 50000,
-  n_iterations = 100,
-  seed = 1983
-)
-
-maplibre_view(maxp_result, column = ".region", legend = FALSE)
-```
+\
+`maxp_result`` ``<-`` `[`max_p_regions`](https://walker-data.com/spopt-r/reference/max_p_regions.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  threshold_var ``=`` ``"popE"``,`\
+`  threshold ``=`` ``50000``,`\
+`  n_iterations ``=`` ``100``,`\
+`  seed ``=`` ``1983`\
+`)`\
+\
+[`maplibre_view`](https://walker-data.com/mapgl/reference/maplibre_view.html)`(``maxp_result``, column ``=`` ``".region"``, legend ``=`` ``FALSE``)`
 
 Let’s step through the key parameters:
 
@@ -109,25 +103,23 @@ Let’s step through the key parameters:
   elements.
 
 The result is an sf object with a new `.region` column indicating each
-tract’s assigned region. The algorithm found 42 regions, each with at
+tract’s assigned region. The algorithm found 41 regions, each with at
 least 50,000 residents.
 
 You can access metadata about the solution through the `spopt`
 attribute:
 
-``` r
-
-attr(maxp_result, "spopt")
-```
+\
+[`attr`](https://rdrr.io/r/base/attr.html)`(``maxp_result``, ``"spopt"``)`
 
     $algorithm
     [1] "max_p"
 
     $n_regions
-    [1] 42
+    [1] 41
 
     $objective
-    [1] 721.8724
+    [1] 671.3679
 
     $threshold_var
     [1] "popE"
@@ -137,51 +129,50 @@ attr(maxp_result, "spopt")
 
     $region_stats
        region n_areas threshold_sum meets_threshold
-    1      34      19         55067            TRUE
-    2      22      20         55756            TRUE
-    3      13      20         57532            TRUE
-    4      15      18         58572            TRUE
-    5      11      17         70300            TRUE
-    6      19      16         53104            TRUE
-    7      30      15         57564            TRUE
-    8      32      14         70987            TRUE
-    9       2      13         57136            TRUE
-    10      7      13         56799            TRUE
-    11      4      19         84803            TRUE
-    12     28      20         80694            TRUE
-    13     10      16         66503            TRUE
-    14     40      17         51836            TRUE
-    15     14      19         59935            TRUE
-    16     31      15         50408            TRUE
-    17     16      20         77562            TRUE
-    18     12      12         53282            TRUE
-    19     37      12         58518            TRUE
-    20      3      14         76137            TRUE
-    21     23      18         66105            TRUE
-    22     29      12         53000            TRUE
-    23     38      15         72698            TRUE
-    24      8      11         53509            TRUE
-    25     24      15         58285            TRUE
-    26     20      13         51909            TRUE
-    27     21      13         56519            TRUE
-    28     26      16         62346            TRUE
-    29      5      19         61238            TRUE
-    30     17      18         68974            TRUE
-    31     41      17         68787            TRUE
-    32     25      14         57793            TRUE
-    33      6      13         56919            TRUE
-    34     18      16         75859            TRUE
-    35      9      14         71454            TRUE
-    36      1      12         54077            TRUE
-    37     35      12         51670            TRUE
-    38     39      12         60798            TRUE
-    39     33      16         75833            TRUE
-    40     42      13         58911            TRUE
-    41     36      10         52973            TRUE
-    42     27      14         56704            TRUE
+    1      39      18         60104            TRUE
+    2      21      22         68044            TRUE
+    3      19      22         60327            TRUE
+    4       1      18         59620            TRUE
+    5       6      12         53251            TRUE
+    6       4      19         79974            TRUE
+    7      11      16         62948            TRUE
+    8      13      14         56700            TRUE
+    9      15      19         80211            TRUE
+    10     12      11         50975            TRUE
+    11     35      12         54458            TRUE
+    12     37      24        103358            TRUE
+    13     33      13         51101            TRUE
+    14     25      18         55656            TRUE
+    15     34      22         62657            TRUE
+    16     38      15         52941            TRUE
+    17     18      15         56183            TRUE
+    18     27      12         56522            TRUE
+    19     24      13         68227            TRUE
+    20     17      13         56948            TRUE
+    21     40      17         74129            TRUE
+    22     10      17         83011            TRUE
+    23     26      13         58473            TRUE
+    24      3      12         51346            TRUE
+    25     28      15         53597            TRUE
+    26     16      13         55192            TRUE
+    27     41      15         58047            TRUE
+    28     31      25         83231            TRUE
+    29     20      19         69435            TRUE
+    30      5      18         69699            TRUE
+    31      7      12         52141            TRUE
+    32     22      15         62023            TRUE
+    33     32      11         57099            TRUE
+    34      2      13         68651            TRUE
+    35     29      16         68612            TRUE
+    36      8      12         60990            TRUE
+    37     23      13         68022            TRUE
+    38     30      12         57042            TRUE
+    39     36      11         52370            TRUE
+    40     14      13         55764            TRUE
+    41      9      22         89777            TRUE
 
     $solve_time
-    [1] 0.03757095
+    [1] 0.04264092
 
     $scaled
     [1] TRUE
@@ -214,18 +205,16 @@ tracts are neighbors if they share any boundary point (including
 corners). You can also use **rook contiguity**, where tracts must share
 an edge to be neighbors:
 
-``` r
-
-maxp_rook <- max_p_regions(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  threshold_var = "popE",
-  threshold = 50000,
-  weights = "rook",
-  n_iterations = 100,
-  seed = 1983
-)
-```
+\
+`maxp_rook`` ``<-`` `[`max_p_regions`](https://walker-data.com/spopt-r/reference/max_p_regions.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  threshold_var ``=`` ``"popE"``,`\
+`  threshold ``=`` ``50000``,`\
+`  weights ``=`` ``"rook"``,`\
+`  n_iterations ``=`` ``100``,`\
+`  seed ``=`` ``1983`\
+`)`
 
 For more control, you can specify weights as a list:
 
@@ -244,22 +233,20 @@ For applications like sales territories or electoral districts, you may
 want regions with compact, regular shapes. The `compact` parameter
 optimizes for compactness in addition to attribute homogeneity:
 
-``` r
-
-maxp_compact <- max_p_regions(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  threshold_var = "popE",
-  threshold = 50000,
-  weights = "rook",
-  compact = TRUE,
-  compact_weight = 0.5,
-  n_iterations = 100,
-  seed = 1983
-)
-
-maplibre_view(maxp_compact, column = ".region", legend = FALSE)
-```
+\
+`maxp_compact`` ``<-`` `[`max_p_regions`](https://walker-data.com/spopt-r/reference/max_p_regions.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  threshold_var ``=`` ``"popE"``,`\
+`  threshold ``=`` ``50000``,`\
+`  weights ``=`` ``"rook"``,`\
+`  compact ``=`` ``TRUE``,`\
+`  compact_weight ``=`` ``0.5``,`\
+`  n_iterations ``=`` ``100``,`\
+`  seed ``=`` ``1983`\
+`)`\
+\
+[`maplibre_view`](https://walker-data.com/mapgl/reference/maplibre_view.html)`(``maxp_compact``, column ``=`` ``".region"``, legend ``=`` ``FALSE``)`
 
 The `compact_weight` parameter (0 to 1) controls the trade-off between
 attribute homogeneity and geometric compactness. Higher values
@@ -278,32 +265,28 @@ builds a minimum spanning tree connecting all tracts based on their
 attribute similarity, then iteratively removes edges to create clusters.
 The algorithm is fast and produces spatially coherent regions.
 
-``` r
-
-skater_result <- skater(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  n_regions = 6,
-  seed = 1983
-)
-
-maplibre_view(skater_result, column = ".region", legend = FALSE)
-```
+\
+`skater_result`` ``<-`` `[`skater`](https://walker-data.com/spopt-r/reference/skater.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  n_regions ``=`` ``6``,`\
+`  seed ``=`` ``1983`\
+`)`\
+\
+[`maplibre_view`](https://walker-data.com/mapgl/reference/maplibre_view.html)`(``skater_result``, column ``=`` ``".region"``, legend ``=`` ``FALSE``)`
 
 SKATER supports a `floor` and `floor_value` parameter if you need
 minimum population constraints:
 
-``` r
-
-skater_constrained <- skater(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  n_regions = 6,
-  floor = "popE",
-  floor_value = 150000,
-  seed = 1983
-)
-```
+\
+`skater_constrained`` ``<-`` `[`skater`](https://walker-data.com/spopt-r/reference/skater.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  n_regions ``=`` ``6``,`\
+`  floor ``=`` ``"popE"``,`\
+`  floor_value ``=`` ``150000``,`\
+`  seed ``=`` ``1983`\
+`)`
 
 ## AZP: Automatic Zoning Procedure
 
@@ -312,20 +295,18 @@ The *Automatic Zoning Procedure* (AZP) ([Openshaw
 uses local search optimization with three algorithm variants: basic
 (greedy), tabu search, and simulated annealing.
 
-``` r
-
-azp_result <- azp(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  n_regions = 20,
-  method = "tabu",
-  tabu_length = 10,
-  max_iterations = 100,
-  seed = 1983
-)
-
-maplibre_view(azp_result, column = ".region", legend = FALSE)
-```
+\
+`azp_result`` ``<-`` `[`azp`](https://walker-data.com/spopt-r/reference/azp.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  n_regions ``=`` ``20``,`\
+`  method ``=`` ``"tabu"``,`\
+`  tabu_length ``=`` ``10``,`\
+`  max_iterations ``=`` ``100``,`\
+`  seed ``=`` ``1983`\
+`)`\
+\
+[`maplibre_view`](https://walker-data.com/mapgl/reference/maplibre_view.html)`(``azp_result``, column ``=`` ``".region"``, legend ``=`` ``FALSE``)`
 
 The `method` parameter controls which algorithm variant to use:
 
@@ -338,18 +319,16 @@ The `method` parameter controls which algorithm variant to use:
 For large problems, you may also want to use the simulated annealing
 variant:
 
-``` r
-
-azp_sa <- azp(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  n_regions = 20,
-  method = "sa",
-  cooling_rate = 0.85,
-  max_iterations = 100,
-  seed = 1983
-)
-```
+\
+`azp_sa`` ``<-`` `[`azp`](https://walker-data.com/spopt-r/reference/azp.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  n_regions ``=`` ``20``,`\
+`  method ``=`` ``"sa"``,`\
+`  cooling_rate ``=`` ``0.85``,`\
+`  max_iterations ``=`` ``100``,`\
+`  seed ``=`` ``1983`\
+`)`
 
 ## SPENC: Spatially-Encouraged Spectral Clustering
 
@@ -359,18 +338,16 @@ measure attribute similarity and incorporates spatial connectivity into
 the spectral embedding. This approach can find clusters with complex,
 non-convex shapes that other methods might miss.
 
-``` r
-
-spenc_result <- spenc(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  n_regions = 15,
-  gamma = 1.0,
-  seed = 1983
-)
-
-maplibre_view(spenc_result, column = ".region", legend = FALSE)
-```
+\
+`spenc_result`` ``<-`` `[`spenc`](https://walker-data.com/spopt-r/reference/spenc.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  n_regions ``=`` ``15``,`\
+`  gamma ``=`` ``1.0``,`\
+`  seed ``=`` ``1983`\
+`)`\
+\
+[`maplibre_view`](https://walker-data.com/mapgl/reference/maplibre_view.html)`(``spenc_result``, column ``=`` ``".region"``, legend ``=`` ``FALSE``)`
 
 The `gamma` parameter controls the RBF kernel bandwidth - higher values
 create “tighter” clusters in attribute space.
@@ -382,16 +359,14 @@ only allows merging adjacent clusters. At each step, it merges the pair
 of adjacent clusters that minimizes the increase in total within-cluster
 variance.
 
-``` r
-
-ward_result <- ward_spatial(
-  dallas,
-  attrs = c("incomeE", "bachelorsE"),
-  n_regions = 15
-)
-
-maplibre_view(ward_result, column = ".region", legend = FALSE)
-```
+\
+`ward_result`` ``<-`` `[`ward_spatial`](https://walker-data.com/spopt-r/reference/ward_spatial.md)`(`\
+`  ``dallas``,`\
+`  attrs ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"incomeE"``, ``"bachelorsE"``)``,`\
+`  n_regions ``=`` ``15`\
+`)`\
+\
+[`maplibre_view`](https://walker-data.com/mapgl/reference/maplibre_view.html)`(``ward_result``, column ``=`` ``".region"``, legend ``=`` ``FALSE``)`
 
 Ward clustering is deterministic (no random seed needed) and tends to
 produce compact, roughly equal-sized regions.

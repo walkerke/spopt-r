@@ -10,7 +10,8 @@ spider_lines(
   min_share = 0,
   cost_matrix = NULL,
   anchor = c("centroid", "point_on_surface"),
-  route_fun = NULL
+  route_fun = NULL,
+  facilities = NULL
 )
 }
 \arguments{
@@ -48,6 +49,11 @@ sfc object with one LINESTRING or MULTILINESTRING per row, in input order,
 with a known CRS. Return an empty geometry for a pair that cannot be
 routed; those links fall back to straight lines. \code{\link[=r5r_route_fun]{r5r_route_fun()}}
 builds such a function from an r5r network.}
+
+\item{facilities}{Optional integer row indices of \code{result$facilities} (or
+\code{result$stores}) to draw links for. Other facilities' links are skipped
+before any geometry is built, so drawing one store's trade area from a
+large \code{\link[=huff]{huff()}} result stays fast.}
 }
 \value{
 An sf object in the CRS of \code{result$demand}, one row per link, with

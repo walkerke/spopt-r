@@ -47,89 +47,87 @@ demonstrate how to use it with spopt’s facility location algorithms.
 r5r requires Java 21 and OpenStreetMap data. Here’s the workflow used to
 generate a travel-time matrix for Tarrant County, Texas:
 
-``` r
-
-# Install r5r and set up Java
-install.packages("r5r")
-install.packages("rJavaEnv")
-rJavaEnv::java_quick_install(version = 21)
-
-# Set Java memory and load libraries
-options(java.parameters = "-Xmx8G") # Allocating 8GB RAM
-library(r5r)
-library(sf)
-library(tidyverse)
-library(tidycensus)
-
-# Download and clip OSM data to study area
-# First, fetch OSM data from https://download.geofabrik.de/north-america/us-south-latest.osm.pbf (3.7GB)
-# Then, use osmium to clip the US South extract to Tarrant County:
-# osmium extract -b -97.55,32.55,-97.0,33.05 us-south.osm.pbf -o tarrant.osm.pbf
-
-# Build routing network
-data_path <- "path/to/osm/directory"
-r5r_core <- build_network(data_path = data_path)
-
-# Get tract centroids as demand points
-tarrant_tracts <- get_acs(
- geography = "tract",
- variables = "B01003_001",
- state = "TX",
- county = "Tarrant",
- geometry = TRUE,
- year = 2023
-) |>
- filter(estimate > 0) |>
- rename(population = estimate)
-
-demand_pts <- tarrant_tracts |>
- st_centroid() |>
- st_transform(4326) |>
- mutate(id = row_number())
-
-# Sample 30 candidate facility locations
-set.seed(1983)
-candidate_pts <- st_sample(st_union(tarrant_tracts), 30) |>
- st_as_sf() |>
- st_transform(4326) |>
- mutate(id = row_number())
-
-# Prepare points for r5r (requires id, lon, lat columns)
-demand_r5r <- demand_pts |>
- st_coordinates() |>
- as_tibble() |>
- rename(lon = X, lat = Y) |>
- mutate(id = as.character(demand_pts$id))
-
-candidates_r5r <- candidate_pts |>
- st_coordinates() |>
- as_tibble() |>
- rename(lon = X, lat = Y) |>
- mutate(id = as.character(candidate_pts$id))
-
-# Calculate travel-time matrix
-ttm <- travel_time_matrix(
- r5r_core,
- origins = demand_r5r,
- destinations = candidates_r5r,
- mode = "CAR",
- departure_datetime = as.POSIXct("2025-03-15 08:00:00"),
- max_trip_duration = 120,
- progress = TRUE
-)
-
-# Reshape to matrix format
-ttm_matrix <- ttm |>
- select(from_id, to_id, travel_time_p50) |>
- pivot_wider(names_from = to_id, values_from = travel_time_p50) |>
- arrange(as.numeric(from_id)) |>
- select(-from_id) |>
- as.matrix()
-
-ttm_matrix[is.na(ttm_matrix)] <- Inf
-
-stop_r5(r5r_core)
-```
+\
+`# Install r5r and set up Java`\
+[`install.packages`](https://rdrr.io/r/utils/install.packages.html)`(``"r5r"``)`\
+[`install.packages`](https://rdrr.io/r/utils/install.packages.html)`(``"rJavaEnv"``)`\
+`rJavaEnv``::`[`java_quick_install`](https://www.ekotov.pro/rJavaEnv/reference/java_quick_install.html)`(``version ``=`` ``21``)`\
+\
+`# Set Java memory and load libraries`\
+[`options`](https://rdrr.io/r/base/options.html)`(``java.parameters ``=`` ``"-Xmx8G"``)`` ``# Allocating 8GB RAM`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`r5r`](https://github.com/ipeaGIT/r5r)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`sf`](https://r-spatial.github.io/sf/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidyverse`](https://tidyverse.tidyverse.org)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidycensus`](https://walker-data.com/tidycensus/)`)`\
+\
+`# Download and clip OSM data to study area`\
+`# First, fetch OSM data from https://download.geofabrik.de/north-america/us-south-latest.osm.pbf (3.7GB)`\
+`# Then, use osmium to clip the US South extract to Tarrant County:`\
+`# osmium extract -b -97.55,32.55,-97.0,33.05 us-south.osm.pbf -o tarrant.osm.pbf`\
+\
+`# Build routing network`\
+`data_path`` ``<-`` ``"path/to/osm/directory"`\
+`r5r_core`` ``<-`` `[`build_network`](https://ipeagit.github.io/r5r/reference/build_network.html)`(``data_path ``=`` ``data_path``)`\
+\
+`# Get tract centroids as demand points`\
+`tarrant_tracts`` ``<-`` `[`get_acs`](https://walker-data.com/tidycensus/reference/get_acs.html)`(`\
+` geography ``=`` ``"tract"``,`\
+` variables ``=`` ``"B01003_001"``,`\
+` state ``=`` ``"TX"``,`\
+` county ``=`` ``"Tarrant"``,`\
+` geometry ``=`` ``TRUE``,`\
+` year ``=`` ``2023`\
+`)`` ``|>`\
+` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``estimate`` ``>`` ``0``)`` ``|>`\
+` `[`rename`](https://dplyr.tidyverse.org/reference/rename.html)`(``population ``=`` ``estimate``)`\
+\
+`demand_pts`` ``<-`` ``tarrant_tracts`` ``|>`\
+` `[`st_centroid`](https://r-spatial.github.io/sf/reference/geos_unary.html)`(``)`` ``|>`\
+` `[`st_transform`](https://r-spatial.github.io/sf/reference/st_transform.html)`(``4326``)`` ``|>`\
+` `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``id ``=`` `[`row_number`](https://dplyr.tidyverse.org/reference/row_number.html)`(``)``)`\
+\
+`# Sample 30 candidate facility locations`\
+[`set.seed`](https://rdrr.io/r/base/Random.html)`(``1983``)`\
+`candidate_pts`` ``<-`` `[`st_sample`](https://r-spatial.github.io/sf/reference/st_sample.html)`(`[`st_union`](https://r-spatial.github.io/sf/reference/geos_combine.html)`(``tarrant_tracts``)``, ``30``)`` ``|>`\
+` `[`st_as_sf`](https://r-spatial.github.io/sf/reference/st_as_sf.html)`(``)`` ``|>`\
+` `[`st_transform`](https://r-spatial.github.io/sf/reference/st_transform.html)`(``4326``)`` ``|>`\
+` `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``id ``=`` `[`row_number`](https://dplyr.tidyverse.org/reference/row_number.html)`(``)``)`\
+\
+`# Prepare points for r5r (requires id, lon, lat columns)`\
+`demand_r5r`` ``<-`` ``demand_pts`` ``|>`\
+` `[`st_coordinates`](https://r-spatial.github.io/sf/reference/st_coordinates.html)`(``)`` ``|>`\
+` `[`as_tibble`](https://tibble.tidyverse.org/reference/as_tibble.html)`(``)`` ``|>`\
+` `[`rename`](https://dplyr.tidyverse.org/reference/rename.html)`(``lon ``=`` ``X``, lat ``=`` ``Y``)`` ``|>`\
+` `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``id ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``demand_pts``$``id``)``)`\
+\
+`candidates_r5r`` ``<-`` ``candidate_pts`` ``|>`\
+` `[`st_coordinates`](https://r-spatial.github.io/sf/reference/st_coordinates.html)`(``)`` ``|>`\
+` `[`as_tibble`](https://tibble.tidyverse.org/reference/as_tibble.html)`(``)`` ``|>`\
+` `[`rename`](https://dplyr.tidyverse.org/reference/rename.html)`(``lon ``=`` ``X``, lat ``=`` ``Y``)`` ``|>`\
+` `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``id ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``candidate_pts``$``id``)``)`\
+\
+`# Calculate travel-time matrix`\
+`ttm`` ``<-`` `[`travel_time_matrix`](https://ipeagit.github.io/r5r/reference/travel_time_matrix.html)`(`\
+` ``r5r_core``,`\
+` origins ``=`` ``demand_r5r``,`\
+` destinations ``=`` ``candidates_r5r``,`\
+` mode ``=`` ``"CAR"``,`\
+` departure_datetime ``=`` `[`as.POSIXct`](https://rdrr.io/r/base/as.POSIXlt.html)`(``"2025-03-15 08:00:00"``)``,`\
+` max_trip_duration ``=`` ``120``,`\
+` progress ``=`` ``TRUE`\
+`)`\
+\
+`# Reshape to matrix format`\
+`ttm_matrix`` ``<-`` ``ttm`` ``|>`\
+` `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``from_id``, ``to_id``, ``travel_time_p50``)`` ``|>`\
+` `[`pivot_wider`](https://tidyr.tidyverse.org/reference/pivot_wider.html)`(``names_from ``=`` ``to_id``, values_from ``=`` ``travel_time_p50``)`` ``|>`\
+` `[`arrange`](https://dplyr.tidyverse.org/reference/arrange.html)`(`[`as.numeric`](https://rdrr.io/r/base/numeric.html)`(``from_id``)``)`` ``|>`\
+` `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``-``from_id``)`` ``|>`\
+` `[`as.matrix`](https://rspatial.github.io/terra/reference/coerce.html)`(``)`\
+\
+`ttm_matrix``[`[`is.na`](https://rdrr.io/r/base/NA.html)`(``ttm_matrix``)``]`` ``<-`` ``Inf`\
+\
+[`stop_r5`](https://ipeagit.github.io/r5r/reference/stop_r5.html)`(``r5r_core``)`
 
 ## Using the bundled travel-time data
 
@@ -137,25 +135,23 @@ spopt includes a pre-computed travel-time matrix for Tarrant County that
 we’ll use for the examples below. This data was generated using the
 workflow above.
 
-``` r
-
-library(spopt)
-library(sf)
-library(tidyverse)
-library(mapgl)
-
-# Load the bundled data
-data(tarrant_travel_times)
-
-# Extract components
-tracts <- tarrant_travel_times$tracts
-demand <- tarrant_travel_times$demand
-candidates <- tarrant_travel_times$candidates
-ttm <- tarrant_travel_times$matrix
-
-# Check dimensions
-dim(ttm)
-```
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`spopt`](https://walker-data.com/spopt-r/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`sf`](https://r-spatial.github.io/sf/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidyverse`](https://tidyverse.tidyverse.org)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`mapgl`](https://walker-data.com/mapgl/)`)`\
+\
+`# Load the bundled data`\
+[`data`](https://rdrr.io/r/utils/data.html)`(``tarrant_travel_times``)`\
+\
+`# Extract components`\
+`tracts`` ``<-`` ``tarrant_travel_times``$``tracts`\
+`demand`` ``<-`` ``tarrant_travel_times``$``demand`\
+`candidates`` ``<-`` ``tarrant_travel_times``$``candidates`\
+`ttm`` ``<-`` ``tarrant_travel_times``$``matrix`\
+\
+`# Check dimensions`\
+[`dim`](https://rdrr.io/r/base/dim.html)`(``ttm``)`
 
     [1] 448  30
 
@@ -167,53 +163,51 @@ facilities), with travel times in minutes.
 Let’s compare P-Median solutions using Euclidean distance versus actual
 travel times:
 
-``` r
-
-# Solution using travel-time matrix
-result_tt <- p_median(
- demand = demand,
- facilities = candidates,
- n_facilities = 5,
- weight_col = "population",
- cost_matrix = ttm
-)
-
-# Solution using Euclidean distance
-result_euc <- p_median(
- demand = demand,
- facilities = candidates,
- n_facilities = 5,
- weight_col = "population"
-)
-
-# Get selected facility IDs from each solution
-selected_tt_ids <- result_tt$facilities |>
- filter(.selected) |>
- pull(id)
-
-selected_euc_ids <- result_euc$facilities |>
- filter(.selected) |>
- pull(id)
-
-# Categorize facilities
-candidates_compared <- candidates |>
- mutate(
-   selected_tt = id %in% selected_tt_ids,
-   selected_euc = id %in% selected_euc_ids,
-   category = case_when(
-     selected_tt & selected_euc ~ "Both methods",
-     selected_tt ~ "Travel time only",
-     selected_euc ~ "Euclidean only",
-     TRUE ~ "Not selected"
-   )
- )
-
-# Count by category
-candidates_compared |>
- st_drop_geometry() |>
- filter(category != "Not selected") |>
- count(category)
-```
+\
+`# Solution using travel-time matrix`\
+`result_tt`` ``<-`` `[`p_median`](https://walker-data.com/spopt-r/reference/p_median.md)`(`\
+` demand ``=`` ``demand``,`\
+` facilities ``=`` ``candidates``,`\
+` n_facilities ``=`` ``5``,`\
+` weight_col ``=`` ``"population"``,`\
+` cost_matrix ``=`` ``ttm`\
+`)`\
+\
+`# Solution using Euclidean distance`\
+`result_euc`` ``<-`` `[`p_median`](https://walker-data.com/spopt-r/reference/p_median.md)`(`\
+` demand ``=`` ``demand``,`\
+` facilities ``=`` ``candidates``,`\
+` n_facilities ``=`` ``5``,`\
+` weight_col ``=`` ``"population"`\
+`)`\
+\
+`# Get selected facility IDs from each solution`\
+`selected_tt_ids`` ``<-`` ``result_tt``$``facilities`` ``|>`\
+` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`` ``|>`\
+` `[`pull`](https://dplyr.tidyverse.org/reference/pull.html)`(``id``)`\
+\
+`selected_euc_ids`` ``<-`` ``result_euc``$``facilities`` ``|>`\
+` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`` ``|>`\
+` `[`pull`](https://dplyr.tidyverse.org/reference/pull.html)`(``id``)`\
+\
+`# Categorize facilities`\
+`candidates_compared`` ``<-`` ``candidates`` ``|>`\
+` `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`   selected_tt ``=`` ``id`` `[`%in%`](https://rspatial.github.io/terra/reference/match.html)` ``selected_tt_ids``,`\
+`   selected_euc ``=`` ``id`` `[`%in%`](https://rspatial.github.io/terra/reference/match.html)` ``selected_euc_ids``,`\
+`   category ``=`` `[`case_when`](https://dplyr.tidyverse.org/reference/case-and-replace-when.html)`(`\
+`     ``selected_tt`` ``&`` ``selected_euc`` ``~`` ``"Both methods"``,`\
+`     ``selected_tt`` ``~`` ``"Travel time only"``,`\
+`     ``selected_euc`` ``~`` ``"Euclidean only"``,`\
+`     ``TRUE`` ``~`` ``"Not selected"`\
+`   ``)`\
+` ``)`\
+\
+`# Count by category`\
+`candidates_compared`` ``|>`\
+` `[`st_drop_geometry`](https://r-spatial.github.io/sf/reference/st_geometry.html)`(``)`` ``|>`\
+` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``category`` ``!=`` ``"Not selected"``)`` ``|>`\
+` `[`count`](https://dplyr.tidyverse.org/reference/count.html)`(``category``)`
 
               category n
     1     Both methods 1
@@ -223,32 +217,30 @@ candidates_compared |>
 The two methods select quite different facility locations. Let’s
 visualize the comparison:
 
-``` r
-
-# Filter to only selected facilities
-selected_facilities <- candidates_compared |>
- filter(category != "Not selected")
-
-maplibre(bounds = tracts) |>
- add_fill_layer(
-   id = "tracts",
-   source = tracts,
-   fill_color = "lightgray",
-   fill_opacity = 0.3
- ) |>
- add_circle_layer(
-   id = "facilities",
-   source = selected_facilities,
-   circle_radius = 10,
-   circle_color = match_expr(
-     column = "category",
-     values = c("Both methods", "Travel time only", "Euclidean only"),
-     stops = c("#9b59b6", "#e74c3c", "#3498db")
-   ),
-   circle_stroke_color = "white",
-   circle_stroke_width = 2
- )
-```
+\
+`# Filter to only selected facilities`\
+`selected_facilities`` ``<-`` ``candidates_compared`` ``|>`\
+` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``category`` ``!=`` ``"Not selected"``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tracts``)`` ``|>`\
+` `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`   id ``=`` ``"tracts"``,`\
+`   source ``=`` ``tracts``,`\
+`   fill_color ``=`` ``"lightgray"``,`\
+`   fill_opacity ``=`` ``0.3`\
+` ``)`` ``|>`\
+` `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`   id ``=`` ``"facilities"``,`\
+`   source ``=`` ``selected_facilities``,`\
+`   circle_radius ``=`` ``10``,`\
+`   circle_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`     column ``=`` ``"category"``,`\
+`     values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"Both methods"``, ``"Travel time only"``, ``"Euclidean only"``)``,`\
+`     stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#9b59b6"``, ``"#e74c3c"``, ``"#3498db"``)`\
+`   ``)``,`\
+`   circle_stroke_color ``=`` ``"white"``,`\
+`   circle_stroke_width ``=`` ``2`\
+` ``)`
 
 Purple markers indicate facilities selected by both methods, red markers
 are selected only when using travel times, and blue markers are selected
@@ -261,21 +253,17 @@ Facilities shift toward locations with better highway access, even if
 they’re farther in straight-line distance. Let’s examine the objective
 values:
 
-``` r
-
-# Compare objective values
-tt_obj <- attr(result_tt, "spopt")$objective
-euc_obj <- attr(result_euc, "spopt")$objective
-
-cat("Travel-time solution objective:", round(tt_obj, 0), "person-minutes\n")
-```
+\
+`# Compare objective values`\
+`tt_obj`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result_tt``, ``"spopt"``)``$``objective`\
+`euc_obj`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``result_euc``, ``"spopt"``)``$``objective`\
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(``"Travel-time solution objective:"``, `[`round`](https://rspatial.github.io/terra/reference/math-generics.html)`(``tt_obj``, ``0``)``, ``"person-minutes\n"``)`
 
     Travel-time solution objective: 29305339 person-minutes
 
-``` r
-
-cat("Euclidean solution objective:", round(euc_obj, 0), "person-meters\n")
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(``"Euclidean solution objective:"``, `[`round`](https://rspatial.github.io/terra/reference/math-generics.html)`(``euc_obj``, ``0``)``, ``"person-meters\n"``)`
 
     Euclidean solution objective: 16669528322 person-meters
 
@@ -288,48 +276,46 @@ optimal for its respective cost measure.
 We can also visualize how demand points are assigned to facilities under
 each solution:
 
-``` r
-
-# Get demand assignments from travel-time solution
-demand_tt <- result_tt$demand |>
- mutate(facility_id = as.character(.facility))
-
-# Get the selected facilities
-facilities_tt <- result_tt$facilities |>
- filter(.selected) |>
- mutate(facility_id = as.character(id))
-
-maplibre(bounds = tracts) |>
- add_fill_layer(
-   id = "tracts",
-   source = tracts,
-   fill_color = "lightgray",
-   fill_opacity = 0.2
- ) |>
- add_circle_layer(
-   id = "demand",
-   source = demand_tt,
-   circle_radius = 4,
-   circle_opacity = 0.7,
-   circle_color = match_expr(
-     column = "facility_id",
-     values = facilities_tt$facility_id,
-     stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
-   )
- ) |>
- add_circle_layer(
-   id = "facilities",
-   source = facilities_tt,
-   circle_radius = 12,
-   circle_color = match_expr(
-     column = "facility_id",
-     values = facilities_tt$facility_id,
-     stops = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00")
-   ),
-   circle_stroke_color = "white",
-   circle_stroke_width = 3
- )
-```
+\
+`# Get demand assignments from travel-time solution`\
+`demand_tt`` ``<-`` ``result_tt``$``demand`` ``|>`\
+` `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``facility_id ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``.facility``)``)`\
+\
+`# Get the selected facilities`\
+`facilities_tt`` ``<-`` ``result_tt``$``facilities`` ``|>`\
+` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``.selected``)`` ``|>`\
+` `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``facility_id ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``id``)``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tracts``)`` ``|>`\
+` `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`   id ``=`` ``"tracts"``,`\
+`   source ``=`` ``tracts``,`\
+`   fill_color ``=`` ``"lightgray"``,`\
+`   fill_opacity ``=`` ``0.2`\
+` ``)`` ``|>`\
+` `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`   id ``=`` ``"demand"``,`\
+`   source ``=`` ``demand_tt``,`\
+`   circle_radius ``=`` ``4``,`\
+`   circle_opacity ``=`` ``0.7``,`\
+`   circle_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`     column ``=`` ``"facility_id"``,`\
+`     values ``=`` ``facilities_tt``$``facility_id``,`\
+`     stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#e41a1c"``, ``"#377eb8"``, ``"#4daf4a"``, ``"#984ea3"``, ``"#ff7f00"``)`\
+`   ``)`\
+` ``)`` ``|>`\
+` `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`   id ``=`` ``"facilities"``,`\
+`   source ``=`` ``facilities_tt``,`\
+`   circle_radius ``=`` ``12``,`\
+`   circle_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(`\
+`     column ``=`` ``"facility_id"``,`\
+`     values ``=`` ``facilities_tt``$``facility_id``,`\
+`     stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#e41a1c"``, ``"#377eb8"``, ``"#4daf4a"``, ``"#984ea3"``, ``"#ff7f00"``)`\
+`   ``)``,`\
+`   circle_stroke_color ``=`` ``"white"``,`\
+`   circle_stroke_width ``=`` ``3`\
+` ``)`
 
 Each demand point is colored by its assigned facility. Notice how the
 service areas follow the road network structure rather than forming
@@ -345,49 +331,45 @@ holds the drive time to its assigned facility.
 picks this up automatically as a `cost` column, so the lines can be
 styled by drive time:
 
-``` r
-
-tt_lines <- spider_lines(result_tt)
-
-summary(tt_lines$cost)
-```
+\
+`tt_lines`` ``<-`` `[`spider_lines`](https://walker-data.com/spopt-r/reference/spider_lines.md)`(``result_tt``)`\
+\
+[`summary`](https://rspatial.github.io/terra/reference/summary.html)`(``tt_lines``$``cost``)`
 
        Min. 1st Qu.  Median    Mean 3rd Qu.    Max.
        2.00   10.00   13.00   13.62   17.00   36.00 
 
-``` r
-
-maplibre(bounds = tracts) |>
-  add_fill_layer(
-    id = "tracts",
-    source = tracts,
-    fill_color = "lightgray",
-    fill_opacity = 0.2
-  ) |>
-  add_line_layer(
-    id = "allocations",
-    source = tt_lines,
-    line_color = interpolate(
-      column = "cost",
-      values = c(5, 15, 30),
-      stops = c("#fee08b", "#f46d43", "#a50026")
-    ),
-    line_width = 1.5
-  ) |>
-  add_circle_layer(
-    id = "facilities",
-    source = facilities_tt,
-    circle_radius = 10,
-    circle_color = "black",
-    circle_stroke_color = "white",
-    circle_stroke_width = 2
-  ) |>
-  add_legend(
-    "Drive time (minutes)",
-    values = c(5, 15, 30),
-    colors = c("#fee08b", "#f46d43", "#a50026")
-  )
-```
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``bounds ``=`` ``tracts``)`` ``|>`\
+`  `[`add_fill_layer`](https://walker-data.com/mapgl/reference/add_fill_layer.html)`(`\
+`    id ``=`` ``"tracts"``,`\
+`    source ``=`` ``tracts``,`\
+`    fill_color ``=`` ``"lightgray"``,`\
+`    fill_opacity ``=`` ``0.2`\
+`  ``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"allocations"``,`\
+`    source ``=`` ``tt_lines``,`\
+`    line_color ``=`` ``interpolate``(`\
+`      column ``=`` ``"cost"``,`\
+`      values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``5``, ``15``, ``30``)``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#fee08b"``, ``"#f46d43"``, ``"#a50026"``)`\
+`    ``)``,`\
+`    line_width ``=`` ``1.5`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"facilities"``,`\
+`    source ``=`` ``facilities_tt``,`\
+`    circle_radius ``=`` ``10``,`\
+`    circle_color ``=`` ``"black"``,`\
+`    circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2`\
+`  ``)`` ``|>`\
+`  ``add_legend``(`\
+`    ``"Drive time (minutes)"``,`\
+`    values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``5``, ``15``, ``30``)``,`\
+`    colors ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#fee08b"``, ``"#f46d43"``, ``"#a50026"``)`\
+`  ``)`
 
 The lines are straight, but their color reflects drive time over the
 road network, so the longest trips stand out.
@@ -399,17 +381,15 @@ to the `route_fun` argument of
 builds one from the same r5r network used to compute the travel-time
 matrix above:
 
-``` r
-
-routed_lines <- spider_lines(
-  result_tt,
-  route_fun = r5r_route_fun(
-    r5r_core,
-    mode = "CAR",
-    departure_datetime = as.POSIXct("2026-10-07 08:00:00")
-  )
-)
-```
+\
+`routed_lines`` ``<-`` `[`spider_lines`](https://walker-data.com/spopt-r/reference/spider_lines.md)`(`\
+`  ``result_tt``,`\
+`  route_fun ``=`` `[`r5r_route_fun`](https://walker-data.com/spopt-r/reference/r5r_route_fun.md)`(`\
+`    ``r5r_core``,`\
+`    mode ``=`` ``"CAR"``,`\
+`    departure_datetime ``=`` `[`as.POSIXct`](https://rdrr.io/r/base/as.POSIXlt.html)`(``"2026-10-07 08:00:00"``)`\
+`  ``)`\
+`)`
 
 Each spider line then traces the driving route between a tract and its
 assigned facility. r5r routes every pair in one batched call. Any pair

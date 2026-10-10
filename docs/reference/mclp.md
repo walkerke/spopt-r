@@ -83,11 +83,11 @@ the best possible outcome given a fixed budget (number of facilities).
 
 The integer programming formulation is: \$\$\max \sum_i w_i z_i\$\$
 Subject to: \$\$\sum_j y_j = p\$\$ \$\$z_i \leq \sum_j a\_{ij} y_j \quad
-\forall i\$\$ \$\$y_j, z_i \in \\0,1\\\$\$
+\forall i\$\$ \$\$y_j, z_i \in \\{0,1\\}\$\$
 
-Where \\w_i\\ is the weight (demand) at location i, \\y_j = 1\\ if
-facility j is selected, \\z_i = 1\\ if demand i is covered, and
-\\a\_{ij} = 1\\ if facility j can cover demand i.
+Where \\(w_i\\) is the weight (demand) at location i, \\(y_j = 1\\) if
+facility j is selected, \\(z_i = 1\\) if demand i is covered, and
+\\(a\_{ij} = 1\\) if facility j can cover demand i.
 
 ## Use Cases
 

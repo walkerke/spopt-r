@@ -67,10 +67,11 @@ required.
 
 The integer programming formulation is: \$\$\min \sum_j y_j\$\$ Subject
 to: \$\$\sum_j a\_{ij} y_j \geq 1 \quad \forall i\$\$ \$\$y_j \in
-\\0,1\\\$\$
+\\{0,1\\}\$\$
 
-Where \\y_j = 1\\ if facility j is selected, and \\a\_{ij} = 1\\ if
-facility j can cover demand point i (distance \\\leq\\ service radius).
+Where \\(y_j = 1\\) if facility j is selected, and \\(a\_{ij} = 1\\) if
+facility j can cover demand point i (distance \\(\leq\\) service
+radius).
 
 ## Use Cases
 

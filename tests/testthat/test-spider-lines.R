@@ -519,3 +519,50 @@ test_that(".assemble_itineraries orders legs, keeps option 1, fills gaps", {
   none <- spopt:::.assemble_itineraries(it[0, ], ids = c("1", "2"))
   expect_true(all(st_is_empty(none)))
 })
+
+# ---------------------------------------------------------------------------
+# facilities argument
+# ---------------------------------------------------------------------------
+
+test_that("facilities limits primary links to the requested facilities", {
+  d <- make_spider_data()
+  res <- p_median(d$demand, d$facilities, n_facilities = 3, weight_col = "pop")
+  j <- res$demand$.facility[1]
+  lines <- spider_lines(res, facilities = j)
+  expect_true(all(lines$facility_index == j))
+  expect_equal(nrow(lines), sum(res$demand$.facility == j))
+  expect_equal(lines$share, rep(1, nrow(lines)))
+  expect_equal(attr(lines, "spopt")$facilities, j)
+})
+
+test_that("facilities subsets huff 'all' links exactly", {
+  d <- make_spider_data(n_demand = 20, n_fac = 5)
+  res <- huff(d$demand, d$facilities, attractiveness_col = "sqft")
+  full <- suppressMessages(spider_lines(res, allocations = "all", min_share = 0.05))
+  some <- suppressMessages(spider_lines(res, allocations = "all", min_share = 0.05,
+                                        facilities = c(4, 2)))
+  ref <- full[full$facility_index %in% c(2, 4), ]
+  expect_equal(nrow(some), nrow(ref))
+  expect_equal(some$demand_index, ref$demand_index)
+  expect_equal(some$facility_index, ref$facility_index)
+  expect_equal(some$share, ref$share)
+})
+
+test_that("facilities works with cflp split allocations", {
+  res <- make_split_data()
+  some <- suppressMessages(spider_lines(res, allocations = "all", facilities = 2))
+  expect_true(all(some$facility_index == 2))
+  alloc <- attr(res, "spopt")$allocation_matrix
+  expect_equal(sort(some$share), sort(alloc[alloc[, 2] > 1e-6, 2]))
+})
+
+test_that("facilities is validated", {
+  d <- make_spider_data()
+  res <- p_median(d$demand, d$facilities, n_facilities = 3, weight_col = "pop")
+  expect_error(spider_lines(res, facilities = 0), "row indices")
+  expect_error(spider_lines(res, facilities = nrow(d$facilities) + 1), "row indices")
+  expect_error(spider_lines(res, facilities = 1.5), "row indices")
+  unused <- setdiff(seq_len(nrow(d$facilities)), res$demand$.facility)[1]
+  expect_warning(empty <- spider_lines(res, facilities = unused), "No valid")
+  expect_equal(nrow(empty), 0)
+})

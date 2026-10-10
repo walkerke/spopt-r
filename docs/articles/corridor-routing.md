@@ -67,49 +67,43 @@ Our cost surface combines two publicly available layers: terrain slope
 derived from a USGS digital elevation model, and land cover from the
 National Land Cover Database (NLCD).
 
-``` r
+\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`spopt`](https://walker-data.com/spopt-r/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`terra`](https://rspatial.org/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`sf`](https://r-spatial.github.io/sf/)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`tidyverse`](https://tidyverse.tidyverse.org)`)`\
+[`library`](https://rdrr.io/r/base/library.html)`(`[`mapgl`](https://walker-data.com/mapgl/)`)`
 
-library(spopt)
-library(terra)
-library(sf)
-library(tidyverse)
-library(mapgl)
-```
+\
+`dem``  ``<-`` `[`rast`](https://rspatial.github.io/terra/reference/rast.html)`(``"/vsicurl/https://walker-data.com/maps/data/wv_dem.tif"``)`\
+`nlcd`` ``<-`` `[`rast`](https://rspatial.github.io/terra/reference/rast.html)`(``"/vsicurl/https://walker-data.com/maps/data/wv_nlcd.tif"``)`\
+\
+`map_bounds``  ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``-``81.25``, ``39.05``, ``-``80.65``, ``39.45``)`
 
-``` r
-
-dem  <- rast("/vsicurl/https://walker-data.com/maps/data/wv_dem.tif")
-nlcd <- rast("/vsicurl/https://walker-data.com/maps/data/wv_nlcd.tif")
-
-map_bounds  <- c(-81.25, 39.05, -80.65, 39.45)
-```
-
-``` r
-
-maplibre(
-  style = openfreemap_style("positron"),
-  bounds = map_bounds
-) |>
-  add_image_source(
-    id = "dem", data = dem,
-    colors = hcl.colors(100, "Earth")
-  ) |>
-  add_raster_layer(
-    id = "dem-layer", source = "dem",
-    raster_opacity = 0.8, raster_resampling = "nearest"
-  )
-maplibre(
-  style = openfreemap_style("positron"),
-  bounds = map_bounds
-) |>
-  add_image_source(
-    id = "nlcd", data = nlcd
-  ) |>
-  add_raster_layer(
-    id = "nlcd-layer", source = "nlcd",
-    raster_opacity = 0.8, raster_resampling = "nearest"
-  )
-```
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(`\
+`  style ``=`` `[`openfreemap_style`](https://walker-data.com/mapgl/reference/openfreemap_style.html)`(``"positron"``)``,`\
+`  bounds ``=`` ``map_bounds`\
+`)`` ``|>`\
+`  `[`add_image_source`](https://walker-data.com/mapgl/reference/add_image_source.html)`(`\
+`    id ``=`` ``"dem"``, data ``=`` ``dem``,`\
+`    colors ``=`` `[`hcl.colors`](https://rdrr.io/r/grDevices/palettes.html)`(``100``, ``"Earth"``)`\
+`  ``)`` ``|>`\
+`  `[`add_raster_layer`](https://walker-data.com/mapgl/reference/add_raster_layer.html)`(`\
+`    id ``=`` ``"dem-layer"``, source ``=`` ``"dem"``,`\
+`    raster_opacity ``=`` ``0.8``, raster_resampling ``=`` ``"nearest"`\
+`  ``)`\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(`\
+`  style ``=`` `[`openfreemap_style`](https://walker-data.com/mapgl/reference/openfreemap_style.html)`(``"positron"``)``,`\
+`  bounds ``=`` ``map_bounds`\
+`)`` ``|>`\
+`  `[`add_image_source`](https://walker-data.com/mapgl/reference/add_image_source.html)`(`\
+`    id ``=`` ``"nlcd"``, data ``=`` ``nlcd`\
+`  ``)`` ``|>`\
+`  `[`add_raster_layer`](https://walker-data.com/mapgl/reference/add_raster_layer.html)`(`\
+`    id ``=`` ``"nlcd-layer"``, source ``=`` ``"nlcd"``,`\
+`    raster_opacity ``=`` ``0.8``, raster_resampling ``=`` ``"nearest"`\
+`  ``)`
 
 Elevation (DEM)
 
@@ -122,12 +116,10 @@ terrain. We’ll first compute a slope raster with
 then assign a base friction of 1.0 for flat ground, increasing by 0.3
 per degree of slope.
 
-``` r
-
-slope <- terrain(dem, v = "slope", unit = "degrees")
-
-friction <- 1.0 + slope * 0.3
-```
+\
+`slope`` ``<-`` `[`terrain`](https://rspatial.github.io/terra/reference/terrain.html)`(``dem``, v ``=`` ``"slope"``, unit ``=`` ``"degrees"``)`\
+\
+`friction`` ``<-`` ``1.0`` ``+`` ``slope`` ``*`` ``0.3`
 
 The second component is a set of land cover multipliers. Different NLCD
 classes carry different construction and permitting costs. Open
@@ -136,43 +128,41 @@ and restoration. Developed areas involve expensive right-of-way
 negotiations. Water bodies and wetlands are treated as impassable due to
 permitting constraints under Section 404 of the Clean Water Act.
 
-``` r
-
-# Land cover weight table
-#
-# NLCD Class              Multiplier  Rationale
-# ─────────────────────── ────────── ──────────────────────────────────
-# 81  Pasture/hay          1.0x       Easiest: flat, minimal clearing
-# 82  Cultivated crops     1.2x       Crop damage compensation
-# 52  Shrub/scrub          1.3x       Light clearing required
-# 21  Developed, open      1.5x       Lawns, parks — minor ROW cost
-# 41  Deciduous forest     2.0x       Timber clearing + restoration
-# 42  Evergreen forest     2.0x       Same
-# 43  Mixed forest         2.0x       Same
-# 22  Developed, low       3.0x       Residential — ROW negotiation
-# 23  Developed, medium    5.0x       Commercial/suburban — expensive ROW
-# 24  Developed, high      10.0x      Urban core — avoid if possible
-# 11  Open water           NA         Impassable (directional drill needed)
-# 90  Woody wetlands       NA         Impassable (Section 404 permitting)
-# 95  Herbaceous wetlands  NA         Impassable (Section 404 permitting)
-
-lc_weights <- c(
-  "81" = 1.0, "82" = 1.2, "52" = 1.3, "21" = 1.5,
-  "41" = 2.0, "42" = 2.0, "43" = 2.0,
-  "22" = 3.0, "23" = 5.0, "24" = 10.0
-)
-lc_exclude <- c(11, 90, 95)
-
-nlcd_vals <- values(nlcd, mat = FALSE)
-lc_mult <- classify(
-  nlcd,
-  rcl = cbind(as.integer(names(lc_weights)), unname(lc_weights)),
-  others = 1.0
-)
-
-cost_surface <- friction * lc_mult
-cost_surface[nlcd_vals %in% lc_exclude] <- NA
-```
+\
+`# Land cover weight table`\
+`#`\
+`# NLCD Class              Multiplier  Rationale`\
+`# ─────────────────────── ────────── ──────────────────────────────────`\
+`# 81  Pasture/hay          1.0x       Easiest: flat, minimal clearing`\
+`# 82  Cultivated crops     1.2x       Crop damage compensation`\
+`# 52  Shrub/scrub          1.3x       Light clearing required`\
+`# 21  Developed, open      1.5x       Lawns, parks — minor ROW cost`\
+`# 41  Deciduous forest     2.0x       Timber clearing + restoration`\
+`# 42  Evergreen forest     2.0x       Same`\
+`# 43  Mixed forest         2.0x       Same`\
+`# 22  Developed, low       3.0x       Residential — ROW negotiation`\
+`# 23  Developed, medium    5.0x       Commercial/suburban — expensive ROW`\
+`# 24  Developed, high      10.0x      Urban core — avoid if possible`\
+`# 11  Open water           NA         Impassable (directional drill needed)`\
+`# 90  Woody wetlands       NA         Impassable (Section 404 permitting)`\
+`# 95  Herbaceous wetlands  NA         Impassable (Section 404 permitting)`\
+\
+`lc_weights`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(`\
+`  ``"81"`` ``=`` ``1.0``, ``"82"`` ``=`` ``1.2``, ``"52"`` ``=`` ``1.3``, ``"21"`` ``=`` ``1.5``,`\
+`  ``"41"`` ``=`` ``2.0``, ``"42"`` ``=`` ``2.0``, ``"43"`` ``=`` ``2.0``,`\
+`  ``"22"`` ``=`` ``3.0``, ``"23"`` ``=`` ``5.0``, ``"24"`` ``=`` ``10.0`\
+`)`\
+`lc_exclude`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``11``, ``90``, ``95``)`\
+\
+`nlcd_vals`` ``<-`` `[`values`](https://rspatial.github.io/terra/reference/values.html)`(``nlcd``, mat ``=`` ``FALSE``)`\
+`lc_mult`` ``<-`` `[`classify`](https://rspatial.github.io/terra/reference/classify.html)`(`\
+`  ``nlcd``,`\
+`  rcl ``=`` `[`cbind`](https://rdrr.io/r/base/cbind.html)`(`[`as.integer`](https://rdrr.io/r/base/integer.html)`(`[`names`](https://rspatial.github.io/terra/reference/names.html)`(``lc_weights``)``)``, `[`unname`](https://rdrr.io/r/base/unname.html)`(``lc_weights``)``)``,`\
+`  others ``=`` ``1.0`\
+`)`\
+\
+`cost_surface`` ``<-`` ``friction`` ``*`` ``lc_mult`\
+`cost_surface``[``nlcd_vals`` `[`%in%`](https://rspatial.github.io/terra/reference/match.html)` ``lc_exclude``]`` ``<-`` ``NA`
 
 The resulting surface reflects the terrain of this part of West
 Virginia. Valleys and pastureland have low friction and are cheap to
@@ -192,34 +182,30 @@ saltwater disposal well, an active brine disposal facility in Ritchie
 County (API: 4708510142). Coordinates were taken from the latitude and
 longitude fields in the well database.
 
-``` r
+\
+`farley_ll``  ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``-``80.832905``, ``39.178088``)`\
+`swd_ll``     ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``-``81.096363``, ``39.256618``)`\
+\
+`# Corridor routing requires projected coordinates matching the cost surface CRS`\
+`to_utm`` ``<-`` ``function``(``ll``)`` ``{`\
+`  `[`st_sfc`](https://r-spatial.github.io/sf/reference/sfc.html)`(`[`st_point`](https://r-spatial.github.io/sf/reference/st.html)`(``ll``)``, crs ``=`` ``4326``)`` ``|>`\
+`    `[`st_transform`](https://r-spatial.github.io/sf/reference/st_transform.html)`(`[`crs`](https://rspatial.github.io/terra/reference/crs.html)`(``cost_surface``)``)`` ``|>`\
+`    `[`st_coordinates`](https://r-spatial.github.io/sf/reference/st_coordinates.html)`(``)`` ``|>`\
+`    `[`as.numeric`](https://rdrr.io/r/base/numeric.html)`(``)`\
+`}`\
+\
+`farley``  ``<-`` ``to_utm``(``farley_ll``)`\
+`swd`` ``<-`` ``to_utm``(``swd_ll``)`
 
-farley_ll  <- c(-80.832905, 39.178088)
-swd_ll     <- c(-81.096363, 39.256618)
-
-# Corridor routing requires projected coordinates matching the cost surface CRS
-to_utm <- function(ll) {
-  st_sfc(st_point(ll), crs = 4326) |>
-    st_transform(crs(cost_surface)) |>
-    st_coordinates() |>
-    as.numeric()
-}
-
-farley  <- to_utm(farley_ll)
-swd <- to_utm(swd_ll)
-```
-
-``` r
-
-# Mapping helpers (reused across sections)
-sites <- tibble(
-  label = c("Farley Unit", "Ritchie Hunter SWD"),
-  type  = c("well_pad", "disposal")
-) |>
-  st_as_sf(geometry = st_sfc(st_point(farley_ll), st_point(swd_ll), crs = 4326))
-
-cost_colors <- hcl.colors(100, "YlOrRd", rev = TRUE)
-```
+\
+`# Mapping helpers (reused across sections)`\
+`sites`` ``<-`` `[`tibble`](https://tibble.tidyverse.org/reference/tibble.html)`(`\
+`  label ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"Farley Unit"``, ``"Ritchie Hunter SWD"``)``,`\
+`  type  ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"well_pad"``, ``"disposal"``)`\
+`)`` ``|>`\
+`  `[`st_as_sf`](https://r-spatial.github.io/sf/reference/st_as_sf.html)`(``geometry ``=`` `[`st_sfc`](https://r-spatial.github.io/sf/reference/sfc.html)`(`[`st_point`](https://r-spatial.github.io/sf/reference/st.html)`(``farley_ll``)``, `[`st_point`](https://r-spatial.github.io/sf/reference/st.html)`(``swd_ll``)``, crs ``=`` ``4326``)``)`\
+\
+`cost_colors`` ``<-`` `[`hcl.colors`](https://rdrr.io/r/grDevices/palettes.html)`(``100``, ``"YlOrRd"``, rev ``=`` ``TRUE``)`
 
 ## Finding the least-cost corridor
 
@@ -227,11 +213,9 @@ With the cost surface and endpoints defined,
 [`route_corridor()`](https://walker-data.com/spopt-r/reference/route_corridor.md)
 finds the path that minimizes total accumulated friction.
 
-``` r
-
-path <- route_corridor(cost_surface, farley, swd)
-path
-```
+\
+`path`` ``<-`` `[`route_corridor`](https://walker-data.com/spopt-r/reference/route_corridor.md)`(``cost_surface``, ``farley``, ``swd``)`\
+`path`
 
     Least-cost corridor
       Method: dijkstra
@@ -239,7 +223,7 @@ path
       Path distance: 31230
       Cells traversed: 883
       Sinuosity: 1.282
-      Solve time: 0.251 s
+      Solve time: 0.248 s
 
 The returned object is an sf LINESTRING with several useful columns.
 `total_cost` is the accumulated friction along the path, a relative
@@ -249,28 +233,26 @@ length to straight-line distance; a value of 1.0 would mean a perfectly
 straight route, and values above 1.0 indicate how much the path deviates
 to find easier terrain.
 
-``` r
-
-maplibre(style = openfreemap_style("positron"), bounds = map_bounds) |>
-  add_image_source(id = "cost", data = cost_surface, colors = cost_colors) |>
-  add_raster_layer(
-    id = "cost-layer", source = "cost",
-    raster_opacity = 0.7, raster_resampling = "nearest"
-  ) |>
-  add_line_layer(
-    id = "corridor", source = st_transform(path, 4326),
-    line_color = "#2563eb", line_width = 3, line_opacity = 0.9
-  ) |>
-  add_circle_layer(
-    id = "sites", source = sites,
-    circle_color = match_expr("type",
-      values = c("well_pad", "disposal"),
-      stops = c("#1e1e1e", "#dc2626")
-    ),
-    circle_radius = 8, circle_stroke_color = "white",
-    circle_stroke_width = 2, tooltip = "label"
-  )
-```
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``style ``=`` `[`openfreemap_style`](https://walker-data.com/mapgl/reference/openfreemap_style.html)`(``"positron"``)``, bounds ``=`` ``map_bounds``)`` ``|>`\
+`  `[`add_image_source`](https://walker-data.com/mapgl/reference/add_image_source.html)`(``id ``=`` ``"cost"``, data ``=`` ``cost_surface``, colors ``=`` ``cost_colors``)`` ``|>`\
+`  `[`add_raster_layer`](https://walker-data.com/mapgl/reference/add_raster_layer.html)`(`\
+`    id ``=`` ``"cost-layer"``, source ``=`` ``"cost"``,`\
+`    raster_opacity ``=`` ``0.7``, raster_resampling ``=`` ``"nearest"`\
+`  ``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"corridor"``, source ``=`` `[`st_transform`](https://r-spatial.github.io/sf/reference/st_transform.html)`(``path``, ``4326``)``,`\
+`    line_color ``=`` ``"#2563eb"``, line_width ``=`` ``3``, line_opacity ``=`` ``0.9`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"sites"``, source ``=`` ``sites``,`\
+`    circle_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(``"type"``,`\
+`      values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"well_pad"``, ``"disposal"``)``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#1e1e1e"``, ``"#dc2626"``)`\
+`    ``)``,`\
+`    circle_radius ``=`` ``8``, circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2``, tooltip ``=`` ``"label"`\
+`  ``)`
 
 The corridor threads through lower-cost terrain, favoring valleys and
 pastureland while routing around forested ridges and water features. The
@@ -300,21 +282,19 @@ crossings, and different stretches of terrain. See
 [`?route_k_corridors`](https://walker-data.com/spopt-r/reference/route_k_corridors.md)
 for references and methodological details.
 
-``` r
-
-alternatives <- route_k_corridors(
-  cost_surface, farley, swd,
-  k = 5,
-  penalty_factor = 2.0
-)
-
-alternatives
-```
+\
+`alternatives`` ``<-`` `[`route_k_corridors`](https://walker-data.com/spopt-r/reference/route_k_corridors.md)`(`\
+`  ``cost_surface``, ``farley``, ``swd``,`\
+`  k ``=`` ``5``,`\
+`  penalty_factor ``=`` ``2.0`\
+`)`\
+\
+`alternatives`
 
     k-Diverse Corridor Routing (spopt)
       Corridors found: 5 of 5 requested
       Penalty: 2.0x within 1217.8 of each prior path
-      Routing time: 1.580s (solve: 1.392s, graph build: 0.189s)
+      Routing time: 1.533s (solve: 1.357s, graph build: 0.176s)
 
                              Cost    Distance  Sinuosity     Spacing  Overlap
       Optimal             101,740       31230      1.282           -        -
@@ -333,44 +313,42 @@ alternative is. The alternatives are not guaranteed to be ordered by
 cost; later alternatives sometimes discover cheaper corridors through
 terrain that earlier iterations didn’t explore.
 
-``` r
-
-alt_colors <- c("#dc2626", "#f97316", "#eab308", "#22c55e", "#3b82f6")
-
-alternatives_4326 <- alternatives |>
-  mutate(
-    color = alt_colors[alternative],
-    alt_label = if_else(alternative == 1L,
-      sprintf("Optimal (cost: %s)", format(round(total_cost), big.mark = ",")),
-      sprintf("Alternative %d (cost: %s)", alternative - 1L,
-              format(round(total_cost), big.mark = ",")))
-  ) |>
-  st_transform(4326)
-
-maplibre(style = openfreemap_style("positron"), bounds = map_bounds) |>
-  add_image_source(id = "cost", data = cost_surface, colors = cost_colors) |>
-  add_raster_layer(id = "cost-layer", source = "cost", raster_opacity = 0.7) |>
-  add_line_layer(
-    id = "corridors", source = alternatives_4326,
-    line_color = get_column("color"),
-    line_width = 3, line_opacity = 0.9
-  ) |>
-  add_circle_layer(
-    id = "sites", source = sites,
-    circle_color = match_expr("type",
-      values = c("well_pad", "disposal"),
-      stops = c("#1e1e1e", "#dc2626")
-    ),
-    circle_radius = 8, circle_stroke_color = "white",
-    circle_stroke_width = 2, tooltip = "label"
-  ) |>
-  add_categorical_legend(
-    "Corridors",
-    values = alternatives_4326$alt_label,
-    colors = alt_colors[seq_len(nrow(alternatives))],
-    position = "bottom-left", patch_shape = "line"
-  )
-```
+\
+`alt_colors`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#dc2626"``, ``"#f97316"``, ``"#eab308"``, ``"#22c55e"``, ``"#3b82f6"``)`\
+\
+`alternatives_4326`` ``<-`` ``alternatives`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`    color ``=`` ``alt_colors``[``alternative``]``,`\
+`    alt_label ``=`` `[`if_else`](https://dplyr.tidyverse.org/reference/if_else.html)`(``alternative`` ``==`` ``1L``,`\
+`      `[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Optimal (cost: %s)"``, `[`format`](https://rdrr.io/r/base/format.html)`(`[`round`](https://rspatial.github.io/terra/reference/math-generics.html)`(``total_cost``)``, big.mark ``=`` ``","``)``)``,`\
+`      `[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Alternative %d (cost: %s)"``, ``alternative`` ``-`` ``1L``,`\
+`              `[`format`](https://rdrr.io/r/base/format.html)`(`[`round`](https://rspatial.github.io/terra/reference/math-generics.html)`(``total_cost``)``, big.mark ``=`` ``","``)``)``)`\
+`  ``)`` ``|>`\
+`  `[`st_transform`](https://r-spatial.github.io/sf/reference/st_transform.html)`(``4326``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``style ``=`` `[`openfreemap_style`](https://walker-data.com/mapgl/reference/openfreemap_style.html)`(``"positron"``)``, bounds ``=`` ``map_bounds``)`` ``|>`\
+`  `[`add_image_source`](https://walker-data.com/mapgl/reference/add_image_source.html)`(``id ``=`` ``"cost"``, data ``=`` ``cost_surface``, colors ``=`` ``cost_colors``)`` ``|>`\
+`  `[`add_raster_layer`](https://walker-data.com/mapgl/reference/add_raster_layer.html)`(``id ``=`` ``"cost-layer"``, source ``=`` ``"cost"``, raster_opacity ``=`` ``0.7``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"corridors"``, source ``=`` ``alternatives_4326``,`\
+`    line_color ``=`` `[`get_column`](https://walker-data.com/mapgl/reference/get_column.html)`(``"color"``)``,`\
+`    line_width ``=`` ``3``, line_opacity ``=`` ``0.9`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"sites"``, source ``=`` ``sites``,`\
+`    circle_color ``=`` `[`match_expr`](https://walker-data.com/mapgl/reference/match_expr.html)`(``"type"``,`\
+`      values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"well_pad"``, ``"disposal"``)``,`\
+`      stops ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#1e1e1e"``, ``"#dc2626"``)`\
+`    ``)``,`\
+`    circle_radius ``=`` ``8``, circle_stroke_color ``=`` ``"white"``,`\
+`    circle_stroke_width ``=`` ``2``, tooltip ``=`` ``"label"`\
+`  ``)`` ``|>`\
+`  `[`add_categorical_legend`](https://walker-data.com/mapgl/reference/map_legends.html)`(`\
+`    ``"Corridors"``,`\
+`    values ``=`` ``alternatives_4326``$``alt_label``,`\
+`    colors ``=`` ``alt_colors``[`[`seq_len`](https://rdrr.io/r/base/seq.html)`(`[`nrow`](https://rspatial.github.io/terra/reference/dimensions.html)`(``alternatives``)``)``]``,`\
+`    position ``=`` ``"bottom-left"``, patch_shape ``=`` ``"line"`\
+`  ``)`
 
 The corridors fan out across the landscape, each taking advantage of
 different terrain features. The penalty-based approach ensures that the
@@ -389,96 +367,88 @@ origin-destination pair,
 pre-builds the graph once so that all three pads can be routed
 efficiently.
 
-``` r
+\
+`# Three Antero pad sites spread across Doddridge County`\
+`pads`` ``<-`` `[`tribble`](https://tibble.tidyverse.org/reference/tribble.html)`(`\
+`  ``~``pad_name``,  ``~``lon``,        ``~``lat``,`\
+`  ``"Farley"``,   ``-``80.832905``,  ``39.178088``,`\
+`  ``"Holtz"``,    ``-``80.781658``,  ``39.303559``,`\
+`  ``"Michels"``,  ``-``80.805644``,  ``39.333569`\
+`)`\
+\
+`pads_utm`` ``<-`` ``pads`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``utm ``=`` `[`map2`](https://purrr.tidyverse.org/reference/map2.html)`(``lon``, ``lat``, ``~`` ``to_utm``(`[`c`](https://rdrr.io/r/base/c.html)`(``.x``, ``.y``)``)``)``)`
 
-# Three Antero pad sites spread across Doddridge County
-pads <- tribble(
-  ~pad_name,  ~lon,        ~lat,
-  "Farley",   -80.832905,  39.178088,
-  "Holtz",    -80.781658,  39.303559,
-  "Michels",  -80.805644,  39.333569
-)
-
-pads_utm <- pads |>
-  mutate(utm = map2(lon, lat, ~ to_utm(c(.x, .y))))
-```
-
-``` r
-
-g <- corridor_graph(cost_surface, neighbours = 8L)
-g
-```
+\
+`g`` ``<-`` `[`corridor_graph`](https://walker-data.com/spopt-r/reference/corridor_graph.md)`(``cost_surface``, neighbours ``=`` ``8L``)`\
+`g`
 
     Corridor graph
       Grid: 1502 x 1463 (2,197,426 cells)
       Cell size: 29.6 x 29.6
       Neighbours: 8 (17,473,816 edges)
-      Build time: 0.033s | Graph storage: ~297.2 MB
+      Build time: 0.032s | Graph storage: ~297.2 MB
 
 The graph object is a snapshot of the cost surface at build time. Once
 built, any number of origin-destination pairs can be routed on it
 without reprocessing the raster.
 
-``` r
+\
+`pad_colors`` ``<-`` `[`c`](https://rdrr.io/r/base/c.html)`(``"#2563eb"``, ``"#16a34a"``, ``"#f97316"``)`\
+\
+`pad_paths`` ``<-`` ``pads_utm`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`    corridor ``=`` `[`map`](https://purrr.tidyverse.org/reference/map.html)`(``utm``, ``~`` `[`route_corridor`](https://walker-data.com/spopt-r/reference/route_corridor.md)`(``g``, ``.x``, ``swd``)``)``,`\
+`    color ``=`` ``pad_colors``[`[`row_number`](https://dplyr.tidyverse.org/reference/row_number.html)`(``)``]`\
+`  ``)`\
+\
+`# Combine corridors into a single sf for mapping`\
+`gathering`` ``<-`` ``pad_paths`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(``corridor ``=`` `[`map2`](https://purrr.tidyverse.org/reference/map2.html)`(``corridor``, ``pad_name``, ``~`` ``{`\
+`    ``.x``$``pad_name`` ``<-`` ``.y`\
+`    `[`class`](https://rdrr.io/r/base/class.html)`(``.x``)`` ``<-`` `[`setdiff`](https://generics.r-lib.org/reference/setops.html)`(`[`class`](https://rdrr.io/r/base/class.html)`(``.x``)``, ``"spopt_corridor"``)`\
+`    `[`attr`](https://rdrr.io/r/base/attr.html)`(``.x``, ``"spopt"``)`` ``<-`` ``NULL`\
+`    ``.x`\
+`  ``}``)``)`` ``|>`\
+`  `[`pull`](https://dplyr.tidyverse.org/reference/pull.html)`(``corridor``)`` ``|>`\
+`  `[`bind_rows`](https://dplyr.tidyverse.org/reference/bind_rows.html)`(``)`` ``|>`\
+`  `[`left_join`](https://dplyr.tidyverse.org/reference/mutate-joins.html)`(`[`tibble`](https://tibble.tidyverse.org/reference/tibble.html)`(``pad_name ``=`` ``pads``$``pad_name``, color ``=`` ``pad_colors``)``, by ``=`` ``"pad_name"``)`` ``|>`\
+`  `[`st_transform`](https://r-spatial.github.io/sf/reference/st_transform.html)`(``4326``)`\
+\
+`# Pad locations for mapping`\
+`pads_sf`` ``<-`` ``pads`` ``|>`\
+`  `[`st_as_sf`](https://r-spatial.github.io/sf/reference/st_as_sf.html)`(``coords ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``"lon"``, ``"lat"``)``, crs ``=`` ``4326``)`
 
-pad_colors <- c("#2563eb", "#16a34a", "#f97316")
-
-pad_paths <- pads_utm |>
-  mutate(
-    corridor = map(utm, ~ route_corridor(g, .x, swd)),
-    color = pad_colors[row_number()]
-  )
-
-# Combine corridors into a single sf for mapping
-gathering <- pad_paths |>
-  mutate(corridor = map2(corridor, pad_name, ~ {
-    .x$pad_name <- .y
-    class(.x) <- setdiff(class(.x), "spopt_corridor")
-    attr(.x, "spopt") <- NULL
-    .x
-  })) |>
-  pull(corridor) |>
-  bind_rows() |>
-  left_join(tibble(pad_name = pads$pad_name, color = pad_colors), by = "pad_name") |>
-  st_transform(4326)
-
-# Pad locations for mapping
-pads_sf <- pads |>
-  st_as_sf(coords = c("lon", "lat"), crs = 4326)
-```
-
-``` r
-
-swd_pt <- sites |> filter(type == "disposal")
-
-maplibre(style = openfreemap_style("positron"), bounds = map_bounds) |>
-  add_image_source(id = "cost", data = cost_surface, colors = cost_colors) |>
-  add_raster_layer(id = "cost-layer", source = "cost", raster_opacity = 0.7) |>
-  add_line_layer(
-    id = "gathering", source = gathering,
-    line_color = get_column("color"),
-    line_width = 2.5, line_opacity = 0.9
-  ) |>
-  add_circle_layer(
-    id = "pads", source = pads_sf,
-    circle_color = "#1e1e1e", circle_radius = 7,
-    circle_stroke_color = "white", circle_stroke_width = 2,
-    tooltip = "pad_name"
-  ) |>
-  add_circle_layer(
-    id = "swd", source = swd_pt,
-    circle_color = "#dc2626", circle_radius = 9,
-    circle_stroke_color = "white", circle_stroke_width = 2,
-    tooltip = "label"
-  ) |>
-  add_categorical_legend(
-    "Gathering System",
-    values = c(pads$pad_name, "Ritchie Hunter SWD"),
-    colors = c(pad_colors, "#dc2626"),
-    position = "bottom-left",
-    patch_shape = "circle"
-  )
-```
+\
+`swd_pt`` ``<-`` ``sites`` ``|>`` `[`filter`](https://dplyr.tidyverse.org/reference/filter.html)`(``type`` ``==`` ``"disposal"``)`\
+\
+[`maplibre`](https://walker-data.com/mapgl/reference/maplibre.html)`(``style ``=`` `[`openfreemap_style`](https://walker-data.com/mapgl/reference/openfreemap_style.html)`(``"positron"``)``, bounds ``=`` ``map_bounds``)`` ``|>`\
+`  `[`add_image_source`](https://walker-data.com/mapgl/reference/add_image_source.html)`(``id ``=`` ``"cost"``, data ``=`` ``cost_surface``, colors ``=`` ``cost_colors``)`` ``|>`\
+`  `[`add_raster_layer`](https://walker-data.com/mapgl/reference/add_raster_layer.html)`(``id ``=`` ``"cost-layer"``, source ``=`` ``"cost"``, raster_opacity ``=`` ``0.7``)`` ``|>`\
+`  `[`add_line_layer`](https://walker-data.com/mapgl/reference/add_line_layer.html)`(`\
+`    id ``=`` ``"gathering"``, source ``=`` ``gathering``,`\
+`    line_color ``=`` `[`get_column`](https://walker-data.com/mapgl/reference/get_column.html)`(``"color"``)``,`\
+`    line_width ``=`` ``2.5``, line_opacity ``=`` ``0.9`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"pads"``, source ``=`` ``pads_sf``,`\
+`    circle_color ``=`` ``"#1e1e1e"``, circle_radius ``=`` ``7``,`\
+`    circle_stroke_color ``=`` ``"white"``, circle_stroke_width ``=`` ``2``,`\
+`    tooltip ``=`` ``"pad_name"`\
+`  ``)`` ``|>`\
+`  `[`add_circle_layer`](https://walker-data.com/mapgl/reference/add_circle_layer.html)`(`\
+`    id ``=`` ``"swd"``, source ``=`` ``swd_pt``,`\
+`    circle_color ``=`` ``"#dc2626"``, circle_radius ``=`` ``9``,`\
+`    circle_stroke_color ``=`` ``"white"``, circle_stroke_width ``=`` ``2``,`\
+`    tooltip ``=`` ``"label"`\
+`  ``)`` ``|>`\
+`  `[`add_categorical_legend`](https://walker-data.com/mapgl/reference/map_legends.html)`(`\
+`    ``"Gathering System"``,`\
+`    values ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``pads``$``pad_name``, ``"Ritchie Hunter SWD"``)``,`\
+`    colors ``=`` `[`c`](https://rdrr.io/r/base/c.html)`(``pad_colors``, ``"#dc2626"``)``,`\
+`    position ``=`` ``"bottom-left"``,`\
+`    patch_shape ``=`` ``"circle"`\
+`  ``)`
 
 Each pad takes a different route to the disposal facility, reflecting
 its position relative to the terrain. The Farley pad in the south has
@@ -496,49 +466,39 @@ understanding what the pipeline would actually cross. The `cell_indices`
 stored in the corridor’s metadata make it possible to extract terrain
 and land cover attributes for every cell along the path.
 
-``` r
-
-meta <- attr(path, "spopt")
-
-path_profile <- tibble(
-  elevation_m = terra::extract(dem, meta$cell_indices)[, 1],
-  slope_deg   = terra::extract(slope, meta$cell_indices)[, 1],
-  nlcd_class  = as.character(terra::extract(nlcd, meta$cell_indices)[, 1])
-)
-
-cat(sprintf("Corridor: Farley Unit -> Ritchie Hunter SWD\n"))
-```
+\
+`meta`` ``<-`` `[`attr`](https://rdrr.io/r/base/attr.html)`(``path``, ``"spopt"``)`\
+\
+`path_profile`` ``<-`` `[`tibble`](https://tibble.tidyverse.org/reference/tibble.html)`(`\
+`  elevation_m ``=`` ``terra``::`[`extract`](https://rspatial.github.io/terra/reference/extract.html)`(``dem``, ``meta``$``cell_indices``)``[``, ``1``]``,`\
+`  slope_deg   ``=`` ``terra``::`[`extract`](https://rspatial.github.io/terra/reference/extract.html)`(``slope``, ``meta``$``cell_indices``)``[``, ``1``]``,`\
+`  nlcd_class  ``=`` `[`as.character`](https://rdrr.io/r/base/character.html)`(``terra``::`[`extract`](https://rspatial.github.io/terra/reference/extract.html)`(``nlcd``, ``meta``$``cell_indices``)``[``, ``1``]``)`\
+`)`\
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"Corridor: Farley Unit -> Ritchie Hunter SWD\n"``)``)`
 
     Corridor: Farley Unit -> Ritchie Hunter SWD
 
-``` r
-
-cat(sprintf("  Length: %.1f km (straight-line: %.1f km)\n",
-    path$path_dist / 1000, path$straight_line_dist / 1000))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"  Length: %.1f km (straight-line: %.1f km)\n"``,`\
+`    ``path``$``path_dist`` ``/`` ``1000``, ``path``$``straight_line_dist`` ``/`` ``1000``)``)`
 
       Length: 31.2 km (straight-line: 24.4 km)
 
-``` r
-
-cat(sprintf("  Sinuosity: %.3f\n", path$sinuosity))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"  Sinuosity: %.3f\n"``, ``path``$``sinuosity``)``)`
 
       Sinuosity: 1.282
 
-``` r
-
-cat(sprintf("  Elevation: %d - %d m\n",
-    min(path_profile$elevation_m), max(path_profile$elevation_m)))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"  Elevation: %d - %d m\n"``,`\
+`    `[`min`](https://rdrr.io/r/base/Extremes.html)`(``path_profile``$``elevation_m``)``, `[`max`](https://rdrr.io/r/base/Extremes.html)`(``path_profile``$``elevation_m``)``)``)`
 
       Elevation: 216 - 335 m
 
-``` r
-
-cat(sprintf("  Slope: mean %.1f deg, max %.1f deg\n",
-    mean(path_profile$slope_deg), max(path_profile$slope_deg)))
-```
+\
+[`cat`](https://rdrr.io/r/base/cat.html)`(`[`sprintf`](https://rdrr.io/r/base/sprintf.html)`(``"  Slope: mean %.1f deg, max %.1f deg\n"``,`\
+`    `[`mean`](https://rspatial.github.io/terra/reference/summarize-generics.html)`(``path_profile``$``slope_deg``)``, `[`max`](https://rdrr.io/r/base/Extremes.html)`(``path_profile``$``slope_deg``)``)``)`
 
       Slope: mean 4.0 deg, max 18.5 deg
 
@@ -547,32 +507,30 @@ complexity lies. Forest crossings require clearing and post-construction
 restoration. Developed areas require right-of-way negotiation with
 landowners. Pastureland is generally the simplest and cheapest to cross.
 
-``` r
-
-lc_labels <- tribble(
-  ~nlcd_class, ~label,
-  "21", "Developed, open space",
-  "22", "Developed, low intensity",
-  "23", "Developed, medium",
-  "41", "Deciduous forest",
-  "42", "Evergreen forest",
-  "43", "Mixed forest",
-  "52", "Shrub/scrub",
-  "71", "Grassland",
-  "81", "Pasture/hay",
-  "82", "Cultivated crops"
-)
-
-path_profile |>
-  count(nlcd_class, name = "cells") |>
-  left_join(lc_labels, by = "nlcd_class") |>
-  mutate(
-    label = coalesce(label, paste("Class", nlcd_class)),
-    pct = round(100 * cells / sum(cells), 1)
-  ) |>
-  arrange(desc(cells)) |>
-  select(label, cells, pct)
-```
+\
+`lc_labels`` ``<-`` `[`tribble`](https://tibble.tidyverse.org/reference/tribble.html)`(`\
+`  ``~``nlcd_class``, ``~``label``,`\
+`  ``"21"``, ``"Developed, open space"``,`\
+`  ``"22"``, ``"Developed, low intensity"``,`\
+`  ``"23"``, ``"Developed, medium"``,`\
+`  ``"41"``, ``"Deciduous forest"``,`\
+`  ``"42"``, ``"Evergreen forest"``,`\
+`  ``"43"``, ``"Mixed forest"``,`\
+`  ``"52"``, ``"Shrub/scrub"``,`\
+`  ``"71"``, ``"Grassland"``,`\
+`  ``"81"``, ``"Pasture/hay"``,`\
+`  ``"82"``, ``"Cultivated crops"`\
+`)`\
+\
+`path_profile`` ``|>`\
+`  `[`count`](https://dplyr.tidyverse.org/reference/count.html)`(``nlcd_class``, name ``=`` ``"cells"``)`` ``|>`\
+`  `[`left_join`](https://dplyr.tidyverse.org/reference/mutate-joins.html)`(``lc_labels``, by ``=`` ``"nlcd_class"``)`` ``|>`\
+`  `[`mutate`](https://dplyr.tidyverse.org/reference/mutate.html)`(`\
+`    label ``=`` `[`coalesce`](https://dplyr.tidyverse.org/reference/coalesce.html)`(``label``, `[`paste`](https://rdrr.io/r/base/paste.html)`(``"Class"``, ``nlcd_class``)``)``,`\
+`    pct ``=`` `[`round`](https://rspatial.github.io/terra/reference/math-generics.html)`(``100`` ``*`` ``cells`` ``/`` `[`sum`](https://rdrr.io/r/base/sum.html)`(``cells``)``, ``1``)`\
+`  ``)`` ``|>`\
+`  `[`arrange`](https://dplyr.tidyverse.org/reference/arrange.html)`(`[`desc`](https://dplyr.tidyverse.org/reference/desc.html)`(``cells``)``)`` ``|>`\
+`  `[`select`](https://dplyr.tidyverse.org/reference/select.html)`(``label``, ``cells``, ``pct``)`
 
     # A tibble: 8 × 3
       label                             cells   pct

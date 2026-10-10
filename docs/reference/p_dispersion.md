@@ -54,14 +54,14 @@ apart.
 
 The mixed integer programming formulation uses a Big-M approach:
 \$\$\max D\$\$ Subject to: \$\$\sum_j y_j = p\$\$ \$\$D \leq d\_{ij} +
-M(2 - y_i - y_j) \quad \forall i \< j\$\$ \$\$y_j \in \\0,1\\, \quad D
+M(2 - y_i - y_j) \quad \forall i \< j\$\$ \$\$y_j \in \\{0,1\\}, \quad D
 \geq 0\$\$
 
-Where D is the minimum separation distance to maximize, \\d\_{ij}\\ is
-the distance between facilities i and j, \\y_j = 1\\ if facility j is
+Where D is the minimum separation distance to maximize, \\(d\_{ij}\\) is
+the distance between facilities i and j, \\(y_j = 1\\) if facility j is
 selected, and M is a large constant. When both facilities i and j are
-selected (\\y_i = y_j = 1\\), the constraint reduces to \\D \leq
-d\_{ij}\\, ensuring D is at most the distance between any pair of
+selected (\\(y_i = y_j = 1\\)), the constraint reduces to \\(D \leq
+d\_{ij}\\), ensuring D is at most the distance between any pair of
 selected facilities.
 
 ## Use Cases

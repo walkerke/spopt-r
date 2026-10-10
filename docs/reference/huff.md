@@ -101,19 +101,19 @@ D\_{ik}^\beta}\$\$
 
 Where:
 
-- \\A_j\\ is the composite attractiveness of store j
+- \\(A_j\\) is the composite attractiveness of store j
 
-- \\D\_{ij}\\ is the distance from i to j
+- \\(D\_{ij}\\) is the distance from i to j
 
-- \\\beta\\ is the distance decay exponent (default -1.5)
+- \\(\beta\\) is the distance decay exponent (default -1.5)
 
 When multiple attractiveness variables are specified, the composite
 attractiveness is computed as:
 
 \$\$A_j = \prod_m V\_{jm}^{\alpha_m}\$\$
 
-Where \\V\_{jm}\\ is the value of attractiveness variable m for store j,
-and \\\alpha_m\\ is the corresponding exponent.
+Where \\(V\_{jm}\\) is the value of attractiveness variable m for store
+j, and \\(\alpha_m\\) is the corresponding exponent.
 
 The distance exponent is typically negative because probability
 decreases with distance. Common values range from -1 to -3.

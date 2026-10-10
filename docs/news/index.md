@@ -1,5 +1,14 @@
 # Changelog
 
+## spopt (development version)
+
+- [`spider_lines()`](https://walker-data.com/spopt-r/reference/spider_lines.md)
+  gains a `facilities` argument to draw links for selected facilities
+  only. Filtering happens before any geometry is built, so one store’s
+  trade area from a large
+  [`huff()`](https://walker-data.com/spopt-r/reference/huff.md) result
+  takes milliseconds instead of seconds.
+
 ## spopt 0.1.3
 
 - New
