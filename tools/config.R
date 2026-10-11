@@ -96,8 +96,19 @@ if (file.exists(mv_ofp)) {
 # read as a single string
 mv_txt <- readLines(mv_fp)
 
+.windows_target <- if (grepl("aarch", R.version$platform)) {
+  "aarch64-pc-windows-gnullvm"
+} else if (grepl("clang", Sys.getenv("R_COMPILED_BY"))) {
+  "x86_64-pc-windows-gnullvm"
+} else if (grepl("i386", R.version$platform)) {
+  "i686-pc-windows-gnu"
+} else {
+  "x86_64-pc-windows-gnu"
+}
+
 # replace placeholder values
 new_txt <- gsub("@CRAN_FLAGS@", .cran_flags, mv_txt) |>
+  gsub("@WINDOWS_TARGET@", .windows_target, x = _) |>
   gsub("@PROFILE@", .profile, x = _) |>
   gsub("@CLEAN_TARGET@", .clean_targets, x = _) |>
   gsub("@LIBDIR@", .libdir, x = _) |>
