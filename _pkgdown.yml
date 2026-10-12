@@ -46,6 +46,7 @@ reference:
   desc: Algorithms for spatially-constrained clustering
   contents:
   - skater
+  - redcap
   - azp
   - max_p_regions
   - spenc

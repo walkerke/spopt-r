@@ -115,35 +115,3 @@ pub fn connected_components(i: &[i32], j: &[i32], n: usize) -> Vec<i32> {
         })
         .collect()
 }
-
-/// Compute sum of squared deviations for a cluster
-pub fn cluster_ssd(attrs: &[Vec<f64>], indices: &[usize]) -> f64 {
-    if indices.is_empty() {
-        return 0.0;
-    }
-
-    let n_attrs = attrs[0].len();
-    let n = indices.len() as f64;
-
-    // Compute centroid
-    let mut centroid = vec![0.0; n_attrs];
-    for &idx in indices {
-        for (k, val) in attrs[idx].iter().enumerate() {
-            centroid[k] += val;
-        }
-    }
-    for c in &mut centroid {
-        *c /= n;
-    }
-
-    // Compute SSD
-    let mut ssd = 0.0;
-    for &idx in indices {
-        for (k, val) in attrs[idx].iter().enumerate() {
-            let diff = val - centroid[k];
-            ssd += diff * diff;
-        }
-    }
-
-    ssd
-}

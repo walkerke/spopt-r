@@ -103,6 +103,21 @@ rust_azp <- function(attrs, n_regions, adj_i, adj_j, method, max_iterations, tab
 #' @export
 rust_spenc <- function(attrs, n_regions, adj_i, adj_j, gamma, seed) .Call(wrap__rust_spenc, attrs, n_regions, adj_i, adj_j, gamma, seed)
 
+#' Solve REDCAP regionalization problem
+#'
+#' Contiguity-constrained hierarchical clustering tree, then SKATER-style cuts.
+#'
+#' @param attrs Attribute matrix (n x p)
+#' @param n_regions Number of regions to create
+#' @param adj_i Row indices of adjacency (0-based)
+#' @param adj_j Column indices of adjacency (0-based)
+#' @param method Linkage: "fullorder-ward"
+#' @param floor_var Optional floor constraint variable, or NULL
+#' @param floor_value Minimum sum of floor_var per region
+#' @return List with labels, n_regions, objective
+#' @export
+rust_redcap <- function(attrs, n_regions, adj_i, adj_j, method, floor_var, floor_value) .Call(wrap__rust_redcap, attrs, n_regions, adj_i, adj_j, method, floor_var, floor_value)
+
 #' Solve spatially-constrained Ward clustering
 #'
 #' @param attrs Attribute matrix (n x p)

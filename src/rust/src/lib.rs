@@ -111,6 +111,38 @@ fn rust_skater(
     )
 }
 
+/// Solve REDCAP regionalization problem
+///
+/// @param attrs Attribute matrix (n x p)
+/// @param n_regions Number of regions to create
+/// @param adj_i Row indices of adjacency (0-based)
+/// @param adj_j Column indices of adjacency (0-based)
+/// @param method Linkage: "fullorder-ward"
+/// @param floor_var Optional floor constraint variable, or NULL
+/// @param floor_value Minimum sum of floor_var per region
+/// @return List with labels, n_regions, objective
+/// @export
+#[extendr]
+fn rust_redcap(
+    attrs: RMatrix<f64>,
+    n_regions: i32,
+    adj_i: Vec<i32>,
+    adj_j: Vec<i32>,
+    method: &str,
+    floor_var: Nullable<Vec<f64>>,
+    floor_value: f64,
+) -> List {
+    region::redcap::solve(
+        attrs,
+        n_regions as usize,
+        &adj_i,
+        &adj_j,
+        method,
+        floor_var.into_option(),
+        floor_value,
+    )
+}
+
 /// Solve spatially-constrained Ward clustering
 ///
 /// @param attrs Attribute matrix (n x p)
@@ -843,6 +875,7 @@ extendr_module! {
     fn rust_azp;
     fn rust_spenc;
     fn rust_ward_constrained;
+    fn rust_redcap;
     fn rust_max_p;
     fn rust_frlm_greedy;
     fn rust_huff;
