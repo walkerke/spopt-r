@@ -3,15 +3,35 @@
 //! Implements the SKATER algorithm from:
 //! Assuncao et al. (2006) "Efficient regionalization techniques for socio-economic
 //! geographical units using minimum spanning trees"
+//!
+//! The minimum spanning tree is cut k-1 times; each cut removes the tree edge
+//! whose removal lowers the total within-region sum of squared deviations the
+//! most, subject to an optional floor on a constraint variable in both halves.
+//!
+//! Evaluating a cut only needs the sums of the two halves it creates. Rooting
+//! each region's subtree and accumulating per-subtree sums (count, attribute
+//! sums, attribute sums of squares, floor sum) in one post-order pass gives
+//! every candidate edge in that region in O(|region| * p). A region's best cut
+//! is cached and only the two regions produced by a cut are re-evaluated, so
+//! the whole procedure is O(k * n * p) instead of re-scanning every edge and
+//! every region for each candidate.
 
 use extendr_api::prelude::*;
-use petgraph::graph::{NodeIndex, UnGraph};
 use petgraph::algo::min_spanning_tree;
 use petgraph::data::FromElements;
+use petgraph::graph::{NodeIndex, UnGraph};
 use petgraph::visit::EdgeRef;
-use std::collections::{HashMap, HashSet};
 
-use crate::graph::cluster_ssd;
+/// Best feasible cut inside one region.
+#[derive(Clone, Copy)]
+struct Cut {
+    /// Decrease in total SSD if the cut is made.
+    gain: f64,
+    /// Index of the MST edge (its position in the original edge list).
+    edge: usize,
+    /// Node whose subtree (away from the region root) becomes the new region.
+    child: usize,
+}
 
 /// Solve SKATER regionalization
 pub fn solve(
@@ -25,209 +45,271 @@ pub fn solve(
 ) -> Vec<i32> {
     let n = attrs.nrows();
     let n_attrs = attrs.ncols();
+    if n == 0 {
+        return Vec::new();
+    }
 
     // Convert R matrix to Vec<Vec<f64>> (row-major)
     let attr_vecs: Vec<Vec<f64>> = (0..n)
         .map(|i| (0..n_attrs).map(|j| attrs[[i, j]]).collect())
         .collect();
 
-    // Build dissimilarity-weighted graph from adjacency
+    // Build dissimilarity-weighted graph from adjacency and take its MST.
     let dissim = compute_edge_dissimilarity(&attr_vecs, adj_i, adj_j);
-
-    // Compute MST
     let mut graph: UnGraph<usize, f64> = UnGraph::new_undirected();
     let nodes: Vec<NodeIndex> = (0..n).map(|i| graph.add_node(i)).collect();
-
     for (idx, (&row, &col)) in adj_i.iter().zip(adj_j.iter()).enumerate() {
-        if row < col as i32 {
+        if row < col {
             graph.add_edge(nodes[row as usize], nodes[col as usize], dissim[idx]);
         }
     }
-
     let mst: UnGraph<usize, f64> = UnGraph::from_elements(min_spanning_tree(&graph));
-
-    // Iteratively cut edges to create regions
-    let mut current_labels: Vec<i32> = vec![0; n];
-    let mut current_n_regions = 1;
-    let mut mst_edges: Vec<(usize, usize, f64)> = mst
+    let mst_edges: Vec<(usize, usize)> = mst
         .edge_references()
-        .map(|e| (e.source().index(), e.target().index(), *e.weight()))
+        .map(|e| (e.source().index(), e.target().index()))
         .collect();
 
-    while current_n_regions < n_regions && !mst_edges.is_empty() {
-        // Find best edge to cut
-        let best_cut = find_best_cut(
-            &attr_vecs,
-            &current_labels,
-            &mst_edges,
-            floor_var.as_deref(),
-            floor_value,
-        );
+    // Tree adjacency: (neighbour, edge index)
+    let mut tree: Vec<Vec<(usize, usize)>> = vec![Vec::new(); n];
+    for (idx, &(a, b)) in mst_edges.iter().enumerate() {
+        tree[a].push((b, idx));
+        tree[b].push((a, idx));
+    }
+    let mut cut_edge = vec![false; mst_edges.len()];
 
-        if let Some((cut_idx, new_labels)) = best_cut {
-            // Remove the cut edge
-            mst_edges.remove(cut_idx);
+    let floor = floor_var.as_deref();
+    let mut scratch = Scratch::new(n, n_attrs);
 
-            // Update labels
-            current_labels = new_labels;
-            current_n_regions += 1;
-        } else {
-            // No valid cut found (floor constraint prevents further cuts)
-            break;
+    // Initial regions: one per connected component of the tree (a connected
+    // graph gives exactly one). Labels are 0-based region ids.
+    let mut labels: Vec<i32> = vec![-1; n];
+    let mut roots: Vec<usize> = Vec::new();
+    for v in 0..n {
+        if labels[v] < 0 {
+            let r = roots.len() as i32;
+            labels[v] = r;
+            relabel_component(v, r, &tree, &cut_edge, &mut labels);
+            roots.push(v);
         }
     }
+    let mut best: Vec<Option<Cut>> = (0..roots.len())
+        .map(|r| {
+            evaluate_region(
+                r, roots[r], &attr_vecs, &tree, &cut_edge, &labels, floor, floor_value, &mut scratch,
+            )
+        })
+        .collect();
 
-    // Convert to 1-based labels for R
-    current_labels.iter().map(|&l| l + 1).collect()
+    while roots.len() < n_regions {
+        // Best cut over all regions: largest gain, ties to the earliest edge.
+        let mut pick: Option<(usize, Cut)> = None;
+        for (r, c) in best.iter().enumerate() {
+            if let Some(c) = c {
+                let better = match pick {
+                    None => true,
+                    Some((_, p)) => c.gain > p.gain || (c.gain == p.gain && c.edge < p.edge),
+                };
+                if better {
+                    pick = Some((r, *c));
+                }
+            }
+        }
+        let (r, cut) = match pick {
+            Some(p) => p,
+            None => break, // no feasible cut anywhere
+        };
+
+        // Make the cut: the child's side becomes a new region.
+        cut_edge[cut.edge] = true;
+        let new_r = roots.len();
+        relabel_component(cut.child, new_r as i32, &tree, &cut_edge, &mut labels);
+        roots.push(cut.child);
+        best[r] = evaluate_region(
+            r, roots[r], &attr_vecs, &tree, &cut_edge, &labels, floor, floor_value, &mut scratch,
+        );
+        best.push(evaluate_region(
+            new_r, cut.child, &attr_vecs, &tree, &cut_edge, &labels, floor, floor_value, &mut scratch,
+        ));
+    }
+
+    // 1-based labels for R
+    labels.iter().map(|&l| l + 1).collect()
 }
 
 /// Compute edge dissimilarities based on attribute differences
-fn compute_edge_dissimilarity(
-    attrs: &[Vec<f64>],
-    adj_i: &[i32],
-    adj_j: &[i32],
-) -> Vec<f64> {
+fn compute_edge_dissimilarity(attrs: &[Vec<f64>], adj_i: &[i32], adj_j: &[i32]) -> Vec<f64> {
     adj_i
         .iter()
         .zip(adj_j.iter())
         .map(|(&i, &j)| {
-            let i = i as usize;
-            let j = j as usize;
-            // Euclidean distance in attribute space
+            let (i, j) = (i as usize, j as usize);
             attrs[i]
                 .iter()
                 .zip(attrs[j].iter())
-                .map(|(a, b)| (a - b).powi(2))
+                .map(|(a, b)| (a - b) * (a - b))
                 .sum::<f64>()
                 .sqrt()
         })
         .collect()
 }
 
-/// Find the best edge to cut that minimizes total SSD
-fn find_best_cut(
+/// Reusable buffers for region evaluation.
+struct Scratch {
+    order: Vec<usize>,
+    parent: Vec<usize>,
+    parent_edge: Vec<usize>,
+    count: Vec<f64>,
+    sum: Vec<Vec<f64>>,
+    sumsq: Vec<Vec<f64>>,
+    fsum: Vec<f64>,
+    visited_stamp: Vec<u32>,
+    stamp: u32,
+    p: usize,
+}
+
+impl Scratch {
+    fn new(n: usize, p: usize) -> Self {
+        Self {
+            order: Vec::with_capacity(n),
+            parent: vec![usize::MAX; n],
+            parent_edge: vec![usize::MAX; n],
+            count: vec![0.0; n],
+            sum: vec![vec![0.0; p]; n],
+            sumsq: vec![vec![0.0; p]; n],
+            fsum: vec![0.0; n],
+            visited_stamp: vec![0; n],
+            stamp: 0,
+            p,
+        }
+    }
+}
+
+/// Relabel every node reachable from `start` over uncut tree edges.
+fn relabel_component(
+    start: usize,
+    label: i32,
+    tree: &[Vec<(usize, usize)>],
+    cut_edge: &[bool],
+    labels: &mut [i32],
+) {
+    labels[start] = label;
+    let mut stack = vec![start];
+    while let Some(v) = stack.pop() {
+        for &(w, e) in &tree[v] {
+            if !cut_edge[e] && labels[w] != label {
+                labels[w] = label;
+                stack.push(w);
+            }
+        }
+    }
+}
+
+/// Within-region SSD from count, sums and sums of squares:
+/// sum_j (Q_j - S_j^2 / n).
+#[inline]
+fn ssd_from_sums(count: f64, sum: &[f64], sumsq: &[f64]) -> f64 {
+    if count <= 0.0 {
+        return 0.0;
+    }
+    sum.iter()
+        .zip(sumsq.iter())
+        .map(|(s, q)| q - s * s / count)
+        .sum()
+}
+
+/// Find the best feasible cut inside region `r`, rooted at `root`.
+///
+/// One traversal from the root records a parent array and a pre-order; a
+/// reverse pass accumulates subtree sums. The two halves of cutting the edge
+/// above node v are v's subtree and the remainder of the region.
+#[allow(clippy::too_many_arguments)]
+fn evaluate_region(
+    r: usize,
+    root: usize,
     attrs: &[Vec<f64>],
-    current_labels: &[i32],
-    edges: &[(usize, usize, f64)],
-    floor_var: Option<&[f64]>,
+    tree: &[Vec<(usize, usize)>],
+    cut_edge: &[bool],
+    labels: &[i32],
+    floor: Option<&[f64]>,
     floor_value: f64,
-) -> Option<(usize, Vec<i32>)> {
-    let n = attrs.len();
-    let mut best_cut_idx: Option<usize> = None;
-    let mut best_ssd = f64::MAX;
-    let mut best_labels: Vec<i32> = Vec::new();
+    s: &mut Scratch,
+) -> Option<Cut> {
+    let p = s.p;
+    s.stamp = s.stamp.wrapping_add(1);
+    if s.stamp == 0 {
+        s.visited_stamp.iter_mut().for_each(|x| *x = 0);
+        s.stamp = 1;
+    }
+    s.order.clear();
 
-    // Build adjacency from current MST edges for component detection
-    for (edge_idx, &(_from, _to, _)) in edges.iter().enumerate() {
-        // Simulate cutting this edge
-        let remaining_edges: Vec<_> = edges
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| *i != edge_idx)
-            .map(|(_, e)| e)
-            .collect();
+    // Pre-order traversal restricted to this region over uncut edges.
+    let mut stack = vec![root];
+    s.visited_stamp[root] = s.stamp;
+    s.parent[root] = usize::MAX;
+    s.parent_edge[root] = usize::MAX;
+    while let Some(v) = stack.pop() {
+        s.order.push(v);
+        for &(w, e) in &tree[v] {
+            if !cut_edge[e] && labels[w] == r as i32 && s.visited_stamp[w] != s.stamp {
+                s.visited_stamp[w] = s.stamp;
+                s.parent[w] = v;
+                s.parent_edge[w] = e;
+                stack.push(w);
+            }
+        }
+    }
 
-        // Find new components after cut
-        let new_labels = compute_components_after_cut(n, &remaining_edges, current_labels);
+    // Initialise per-node sums, then accumulate children into parents in
+    // reverse pre-order (children always come after their parent).
+    for &v in &s.order {
+        s.count[v] = 1.0;
+        s.fsum[v] = floor.map_or(0.0, |f| f[v]);
+        for j in 0..p {
+            let x = attrs[v][j];
+            s.sum[v][j] = x;
+            s.sumsq[v][j] = x * x;
+        }
+    }
+    for idx in (1..s.order.len()).rev() {
+        let v = s.order[idx];
+        let u = s.parent[v];
+        s.count[u] += s.count[v];
+        s.fsum[u] += s.fsum[v];
+        for j in 0..p {
+            s.sum[u][j] += s.sum[v][j];
+            s.sumsq[u][j] += s.sumsq[v][j];
+        }
+    }
 
-        // Check floor constraint
-        if let Some(fv) = floor_var {
-            let floor_satisfied = check_floor_constraint(&new_labels, fv, floor_value);
-            if !floor_satisfied {
+    let total_count = s.count[root];
+    let total_f = s.fsum[root];
+    let region_ssd = ssd_from_sums(total_count, &s.sum[root], &s.sumsq[root]);
+
+    let mut best: Option<Cut> = None;
+    let mut rest_sum = vec![0.0; p];
+    let mut rest_sumsq = vec![0.0; p];
+    for &v in s.order.iter().skip(1) {
+        if let Some(_f) = floor {
+            if s.fsum[v] < floor_value || total_f - s.fsum[v] < floor_value {
                 continue;
             }
         }
-
-        // Compute SSD for this cut
-        let ssd = compute_total_ssd(attrs, &new_labels);
-
-        if ssd < best_ssd {
-            best_ssd = ssd;
-            best_cut_idx = Some(edge_idx);
-            best_labels = new_labels;
+        let rest_count = total_count - s.count[v];
+        for j in 0..p {
+            rest_sum[j] = s.sum[root][j] - s.sum[v][j];
+            rest_sumsq[j] = s.sumsq[root][j] - s.sumsq[v][j];
+        }
+        let gain = region_ssd
+            - ssd_from_sums(s.count[v], &s.sum[v], &s.sumsq[v])
+            - ssd_from_sums(rest_count, &rest_sum, &rest_sumsq);
+        let e = s.parent_edge[v];
+        let better = match best {
+            None => true,
+            Some(b) => gain > b.gain || (gain == b.gain && e < b.edge),
+        };
+        if better {
+            best = Some(Cut { gain, edge: e, child: v });
         }
     }
-
-    best_cut_idx.map(|idx| (idx, best_labels))
-}
-
-/// Compute connected components after removing an edge
-fn compute_components_after_cut(
-    n: usize,
-    edges: &[&(usize, usize, f64)],
-    current_labels: &[i32],
-) -> Vec<i32> {
-    // Union-find
-    let mut parent: Vec<usize> = (0..n).collect();
-
-    fn find(parent: &mut [usize], x: usize) -> usize {
-        if parent[x] != x {
-            parent[x] = find(parent, parent[x]);
-        }
-        parent[x]
-    }
-
-    fn union(parent: &mut [usize], x: usize, y: usize) {
-        let rx = find(parent, x);
-        let ry = find(parent, y);
-        if rx != ry {
-            parent[ry] = rx;
-        }
-    }
-
-    for &&(from, to, _) in edges {
-        union(&mut parent, from, to);
-    }
-
-    // Assign new labels
-    let mut label_map: HashMap<usize, i32> = HashMap::new();
-    let max_existing = current_labels.iter().max().copied().unwrap_or(0);
-    let mut next_label = max_existing + 1;
-
-    let mut result = vec![0i32; n];
-    for i in 0..n {
-        let root = find(&mut parent, i);
-        let label = *label_map.entry(root).or_insert_with(|| {
-            let l = next_label;
-            next_label += 1;
-            l
-        });
-        result[i] = label;
-    }
-
-    // Relabel to be contiguous from 0
-    let unique_labels: HashSet<_> = result.iter().copied().collect();
-    let label_remap: HashMap<i32, i32> = unique_labels
-        .into_iter()
-        .enumerate()
-        .map(|(i, l)| (l, i as i32))
-        .collect();
-
-    result.iter().map(|l| label_remap[l]).collect()
-}
-
-/// Check if floor constraint is satisfied for all regions
-fn check_floor_constraint(labels: &[i32], floor_var: &[f64], floor_value: f64) -> bool {
-    let mut region_sums: HashMap<i32, f64> = HashMap::new();
-
-    for (&label, &val) in labels.iter().zip(floor_var.iter()) {
-        *region_sums.entry(label).or_insert(0.0) += val;
-    }
-
-    region_sums.values().all(|&sum| sum >= floor_value)
-}
-
-/// Compute total SSD across all regions
-fn compute_total_ssd(attrs: &[Vec<f64>], labels: &[i32]) -> f64 {
-    // Group indices by region
-    let mut region_indices: HashMap<i32, Vec<usize>> = HashMap::new();
-    for (i, &label) in labels.iter().enumerate() {
-        region_indices.entry(label).or_default().push(i);
-    }
-
-    // Sum SSD across regions
-    region_indices
-        .values()
-        .map(|indices| cluster_ssd(attrs, indices))
-        .sum()
+    best
 }
