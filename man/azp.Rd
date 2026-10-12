@@ -11,10 +11,11 @@ azp(
   weights = "queen",
   bridge_islands = FALSE,
   method = c("tabu", "basic", "sa"),
-  max_iterations = 100L,
+  max_iterations = 1000L,
   tabu_length = 10L,
   cooling_rate = 0.99,
   initial_temperature = 0,
+  initial_regions = NULL,
   scale = TRUE,
   seed = NULL,
   verbose = FALSE
@@ -26,7 +27,9 @@ azp(
 \item{attrs}{Character vector of column names to use for clustering
 (e.g., \code{c("var1", "var2")}). If NULL, uses all numeric columns.}
 
-\item{n_regions}{Integer. Number of regions (clusters) to create.}
+\item{n_regions}{Integer. Number of regions (clusters) to create. May be
+omitted when \code{initial_regions} is supplied, in which case it is taken
+from the number of distinct starting regions.}
 
 \item{weights}{Spatial weights specification. Can be:
 \itemize{
@@ -45,21 +48,34 @@ the function will error when the spatial weights graph is disconnected.}
 \item{method}{Character. Optimization method: "basic" (greedy local search),
 "tabu" (tabu search), or "sa" (simulated annealing). Default is "tabu".}
 
-\item{max_iterations}{Integer. Maximum number of iterations (default 100).}
+\item{max_iterations}{Integer. Iteration budget (default 1000). What one
+iteration means depends on \code{method}: for \code{"basic"} it is a full pass over
+all regions (the search stops earlier once a pass makes no move); for
+\code{"tabu"} it is one move (the search stops earlier after
+\code{max(100, 10 * tabu_length)} consecutive non-improving moves); for \code{"sa"}
+it is one sweep over the current border followed by one cooling step.}
 
 \item{tabu_length}{Integer. Length of tabu list for tabu method (default 10).}
 
-\item{cooling_rate}{Numeric. Cooling rate for SA method, between 0 and 1
-(default 0.99).}
+\item{cooling_rate}{Numeric. Cooling rate for SA method, between 0 and 1,
+applied once per sweep (default 0.99).}
 
 \item{initial_temperature}{Numeric. Initial temperature for SA method.
-If 0 (default), automatically set based on initial objective.}
+If 0 (default), it is calibrated from a sample of uphill moves so that a
+typical uphill move is accepted with probability 0.8 at the start.}
 
 \item{scale}{Logical. If TRUE (default), standardize attributes before clustering.}
 
 \item{seed}{Optional integer for reproducibility.}
 
 \item{verbose}{Logical. Print progress messages.}
+
+\item{initial_regions}{Optional warm start: a vector of length \code{nrow(data)}
+giving a starting region for every area, or an sf object returned by
+another spopt regionalization function (its \code{.region} column is used).
+Every starting region must be spatially contiguous under \code{weights}.
+Starting AZP from a SKATER or Ward solution usually beats a random start.
+If NULL (default), a random contiguous partition is grown from seeds.}
 }
 \value{
 An sf object with a \code{.region} column containing cluster assignments.
@@ -69,6 +85,7 @@ Metadata is stored in the "spopt" attribute, including:
 \item method: The optimization method used
 \item n_regions: Number of regions created
 \item objective: Total within-region sum of squared deviations
+\item initial_objective: The same quantity for the starting partition
 \item solve_time: Time to solve in seconds
 }
 }
@@ -82,7 +99,7 @@ maintaining spatial contiguity. Three variants are available: basic
 The Automatic Zoning Procedure (AZP) was introduced by Openshaw (1977) and
 refined by Openshaw & Rao (1995). It is a local search algorithm that:
 \enumerate{
-\item Starts with an initial random partition into n_regions
+\item Starts with an initial partition into n_regions (random, or \code{initial_regions})
 \item Iteratively moves border areas between regions to reduce heterogeneity
 \item Maintains spatial contiguity throughout
 \item Terminates when no improving moves are found
@@ -90,12 +107,20 @@ refined by Openshaw & Rao (1995). It is a local search algorithm that:
 
 Three variants are available:
 \itemize{
-\item \strong{basic}: Greedy local search that only accepts improving moves
-\item \strong{tabu}: Tabu search that can accept non-improving moves to escape
-local optima, with a tabu list preventing cycling
-\item \strong{sa}: Simulated annealing that accepts worse moves with decreasing
-probability as temperature cools
+\item \strong{basic}: Openshaw's greedy local search. Regions are visited
+in random order and border areas are pulled in while any improving move
+exists. Converges to a local optimum under single-area moves.
+\item \strong{tabu}: Steepest-descent / mildest-ascent search with a tabu
+list on reversed moves and an aspiration rule, so it can leave local optima.
+\item \strong{sa}: Simulated annealing that accepts worse moves with
+decreasing probability as temperature cools, one cooling step per sweep
+of the border.
 }
+
+The tabu and SA results are finished with a greedy pass, so every returned
+partition is a local optimum. Move evaluation uses the exact O(p) update of a
+within-region sum of squares when one area is added or removed, and the
+contiguity check is only run for moves that would otherwise be accepted.
 }
 \examples{
 \donttest{
@@ -112,6 +137,10 @@ result <- azp(nc, attrs = c("SID74", "SID79"), n_regions = 8,
 # Simulated annealing
 result <- azp(nc, attrs = c("SID74", "SID79"), n_regions = 8,
               method = "sa", cooling_rate = 0.95)
+
+# Warm start from a SKATER solution (usually the best use of AZP)
+sk <- skater(nc, attrs = c("SID74", "SID79"), n_regions = 8)
+result <- azp(nc, attrs = c("SID74", "SID79"), initial_regions = sk, method = "sa")
 
 # View results
 plot(result[".region"])

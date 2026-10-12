@@ -14,6 +14,7 @@ rust_azp(
   tabu_length,
   cooling_rate,
   initial_temperature,
+  initial_regions,
   seed
 )
 }
@@ -36,10 +37,12 @@ rust_azp(
 
 \item{initial_temperature}{SA initial temperature (for sa method)}
 
+\item{initial_regions}{Optional starting labels (0-based, one per area), or NULL}
+
 \item{seed}{Random seed}
 }
 \value{
-List with labels, n_regions, objective
+List with labels, n_regions, objective, initial_objective, iterations
 }
 \description{
 Automatic Zoning Procedure with basic, tabu, and SA variants.

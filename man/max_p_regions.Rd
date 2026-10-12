@@ -16,7 +16,7 @@ max_p_regions(
   compact_metric = "centroid",
   homogeneous = TRUE,
   n_iterations = 100L,
-  n_sa_iterations = 100L,
+  n_sa_iterations = 1000L,
   cooling_rate = 0.99,
   tabu_length = 10L,
   scale = TRUE,
@@ -73,15 +73,19 @@ so that regions are internally homogeneous. If FALSE, maximizes within-region
 dissimilarity.}
 
 \item{n_iterations}{Integer. Number of construction phase iterations (default 100).
-Higher values explore more random starting solutions.}
+Each iteration grows a complete feasible solution from a random order of
+seeds; all requested iterations are run (in parallel) and the solution with
+the most regions is kept. Raising this is cheap and can find an extra region.}
 
-\item{n_sa_iterations}{Integer. Number of simulated annealing iterations (default 100).
-Set to 0 to skip the SA refinement phase.}
+\item{n_sa_iterations}{Integer. Number of simulated annealing sweeps over the
+region borders in the improvement phase (default 1000; each sweep is
+followed by one cooling step). Set to 0 to keep the construction result.}
 
-\item{cooling_rate}{Numeric. SA cooling rate between 0 and 1 (default 0.99).
-Smaller values cool faster, larger values allow more exploration.}
+\item{cooling_rate}{Numeric. SA cooling rate between 0 and 1 (default 0.99),
+applied once per sweep. Smaller values cool faster.}
 
-\item{tabu_length}{Integer. Length of tabu list for SA phase (default 10).}
+\item{tabu_length}{Integer. Length of the short-term tabu list that blocks
+immediate reversals during the improvement phase (default 10).}
 
 \item{scale}{Logical. If TRUE (default), standardize attributes before
 computing dissimilarity.}
@@ -122,10 +126,17 @@ of homogeneous regions while ensuring:
 The algorithm has two phases:
 \enumerate{
 \item Construction phase: Builds feasible solutions via randomized greedy
-region growing. Multiple random starts are explored in parallel.
-\item Simulated annealing phase: Refines solutions by moving border areas
-between regions to minimize within-region dissimilarity while respecting
-constraints.
+region growing. Multiple random starts are explored in parallel, and the
+solution with the most regions is kept (ties broken by homogeneity).
+When a single frontier area is enough to reach the threshold, the one
+that overshoots it least is taken, so that more regions can be formed.
+Enclaves join the neighbouring region whose heterogeneity they raise least.
+\item Improvement phase: a floor-constrained Automatic Zoning Procedure
+(see \code{\link[=azp]{azp()}}): a greedy pass to a local optimum, simulated annealing over
+the region borders for \code{n_sa_iterations} sweeps, and a final greedy
+polish. Moves never break contiguity or take a region below the
+threshold. With \code{compact = TRUE} or \code{homogeneous = FALSE} the original
+annealing routine over the combined objective is used instead.
 }
 
 When \code{compact = TRUE}, the algorithm additionally optimizes for compact region

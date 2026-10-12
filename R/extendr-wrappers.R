@@ -84,10 +84,11 @@ rust_skater <- function(attrs, adj_i, adj_j, n_regions, floor_var, floor_value, 
 #' @param tabu_length Tabu list length (for tabu method)
 #' @param cooling_rate SA cooling rate (for sa method)
 #' @param initial_temperature SA initial temperature (for sa method)
+#' @param initial_regions Optional starting labels (0-based, one per area), or NULL
 #' @param seed Random seed
-#' @return List with labels, n_regions, objective
+#' @return List with labels, n_regions, objective, initial_objective, iterations
 #' @export
-rust_azp <- function(attrs, n_regions, adj_i, adj_j, method, max_iterations, tabu_length, cooling_rate, initial_temperature, seed) .Call(wrap__rust_azp, attrs, n_regions, adj_i, adj_j, method, max_iterations, tabu_length, cooling_rate, initial_temperature, seed)
+rust_azp <- function(attrs, n_regions, adj_i, adj_j, method, max_iterations, tabu_length, cooling_rate, initial_temperature, initial_regions, seed) .Call(wrap__rust_azp, attrs, n_regions, adj_i, adj_j, method, max_iterations, tabu_length, cooling_rate, initial_temperature, initial_regions, seed)
 
 #' Solve SPENC regionalization problem
 #'

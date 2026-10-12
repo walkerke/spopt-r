@@ -192,6 +192,7 @@ fn rust_azp(
     tabu_length: i32,
     cooling_rate: f64,
     initial_temperature: f64,
+    initial_regions: Nullable<Vec<i32>>,
     seed: Nullable<i64>,
 ) -> List {
     region::azp::solve(
@@ -204,6 +205,7 @@ fn rust_azp(
         tabu_length as usize,
         cooling_rate,
         initial_temperature,
+        initial_regions.into_option(),
         seed.into_option().map(|s| s as u64),
     )
 }

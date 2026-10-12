@@ -20,6 +20,8 @@ use rayon::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use super::local_search::{anneal, greedy, Adj, Floor, Partition};
+
 /// Compactness metric to use for region evaluation
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum CompactnessMetric {
@@ -188,10 +190,6 @@ pub fn solve(
     let areas_ref = areas.as_deref();
     let moments_ref = moments.as_deref();
 
-    // Precompute pairwise Manhattan distances for objective calculation
-    // Only compute for neighbors to save memory
-    let neighbor_distances = compute_neighbor_distances(&attr_vecs, &adj);
-
     // Determine number of parallel workers
     let n_workers = rayon::current_num_threads().min(n_iterations).max(1);
     let iterations_per_worker = (n_iterations + n_workers - 1) / n_workers;
@@ -201,6 +199,7 @@ pub fn solve(
 
     // Clone centroids for parallel access
     let centroids_clone = centroids.clone();
+    let attrs_ref = &attr_vecs;
 
     // Run parallel construction phase
     let base_seed = seed.unwrap_or(42);
@@ -210,13 +209,13 @@ pub fn solve(
             let mut rng = ChaCha8Rng::seed_from_u64(base_seed.wrapping_add(worker_id as u64));
             let mut worker_best: Option<RegionState> = None;
             let mut worker_best_p = 0usize;
-            let mut stable_count = 0usize;
+            let mut worker_best_obj = f64::INFINITY;
 
             for _iter in 0..iterations_per_worker {
-                // Early termination: if we haven't improved in 50 iterations, stop
-                if stable_count > 50 {
-                    break;
-                }
+                // Construction is cheap (one BFS per region), so every requested
+                // iteration is run: the maximum p is often found late, and an
+                // early stop after a fixed number of non-improving tries was
+                // leaving regions on the table.
 
                 // Check global best - if another worker found much better, we can stop too
                 let global_best = best_n_regions.load(Ordering::Relaxed);
@@ -227,6 +226,7 @@ pub fn solve(
                 // Construction phase
                 let state = construct_solution(
                     n,
+                    attrs_ref,
                     threshold_var,
                     threshold,
                     &adj,
@@ -240,13 +240,18 @@ pub fn solve(
 
                 if state.n_regions > worker_best_p {
                     worker_best_p = state.n_regions;
+                    worker_best_obj = compute_objective(attrs_ref, &state);
                     worker_best = Some(state);
-                    stable_count = 0;
 
                     // Update global best
                     let _ = best_n_regions.fetch_max(worker_best_p, Ordering::Relaxed);
-                } else {
-                    stable_count += 1;
+                } else if state.n_regions == worker_best_p {
+                    // Same p: keep the more homogeneous construction
+                    let obj = compute_objective(attrs_ref, &state);
+                    if obj < worker_best_obj {
+                        worker_best_obj = obj;
+                        worker_best = Some(state);
+                    }
                 }
             }
 
@@ -258,7 +263,18 @@ pub fn solve(
     let mut best_state = results
         .into_iter()
         .flatten()
-        .max_by_key(|s| s.n_regions);
+        .map(|s| (s.n_regions, compute_objective(&attr_vecs, &s), s))
+        .fold(None::<(usize, f64, RegionState)>, |acc, cur| match acc {
+            None => Some(cur),
+            Some(b) => {
+                if cur.0 > b.0 || (cur.0 == b.0 && cur.1 < b.1) {
+                    Some(cur)
+                } else {
+                    Some(b)
+                }
+            }
+        })
+        .map(|(_, _, s)| s);
 
     if best_state.is_none() {
         // Fallback: single region containing everything
@@ -272,15 +288,42 @@ pub fn solve(
 
     let mut state = best_state.unwrap();
 
-    // Simulated annealing phase to improve solution quality
-    if n_sa_iterations > 0 && state.n_regions > 1 {
+    // Improvement phase. With the default objective (homogeneous regions, no
+    // compactness term) this is a floor-constrained AZP: a greedy pass to a
+    // local optimum, simulated annealing over the border, and a final greedy
+    // polish. The compactness and heterogeneous objectives keep the original
+    // annealing routine.
+    if n_sa_iterations > 0 && state.n_regions > 1 && homogeneous && !use_compactness {
+        let floor = Floor { var: threshold_var, min: threshold };
+        let ls_adj = Adj::from_indices(adj_i, adj_j, n);
+        let mut rng = ChaCha8Rng::seed_from_u64(seed.unwrap_or(42).wrapping_add(999));
+        let mut part = Partition::new(&state.labels, state.n_regions, &attr_vecs, Some(floor));
+        greedy(&mut part, &attr_vecs, &ls_adj, Some(floor), 1000, &mut rng);
+        part = anneal(
+            part,
+            &attr_vecs,
+            &ls_adj,
+            Some(floor),
+            n_sa_iterations,
+            cooling_rate,
+            0.0,
+            tabu_length,
+            &mut rng,
+        );
+        greedy(&mut part, &attr_vecs, &ls_adj, Some(floor), 1000, &mut rng);
+        state = RegionState {
+            labels: part.labels.clone(),
+            region_members: part.members.clone(),
+            region_thresholds: part.floor_sums.clone(),
+            n_regions: part.k(),
+        };
+    } else if n_sa_iterations > 0 && state.n_regions > 1 {
         state = simulated_annealing(
             state,
             &attr_vecs,
             threshold_var,
             threshold,
             &adj,
-            &neighbor_distances,
             n_sa_iterations,
             cooling_rate,
             tabu_length,
@@ -331,6 +374,7 @@ pub fn solve(
 /// Construct a single solution using greedy region growing
 fn construct_solution(
     n: usize,
+    attrs: &[Vec<f64>],
     threshold_var: &[f64],
     threshold: f64,
     adj: &AdjList,
@@ -372,7 +416,7 @@ fn construct_solution(
     }
 
     // Phase 2: Assign all enclaves to valid regions
-    assign_enclaves_to_valid_regions(&mut state, threshold_var, threshold, adj, rng);
+    assign_enclaves_to_valid_regions(&mut state, attrs, threshold_var, threshold, adj, rng);
 
     // Compact region IDs (remove empty regions)
     compact_regions(&mut state);
@@ -446,8 +490,24 @@ fn grow_region(
             }
             chosen
         } else {
-            // Original behavior: pick random frontier element
-            let idx = rng.gen_range(0..frontier.len());
+            // If one frontier area is enough to reach the threshold, take the
+            // one that overshoots it least, so the remaining areas can form
+            // more regions (this is what max-p maximizes). Otherwise pick a
+            // random frontier area, as in Duque, Anselin & Rey (2012).
+            let need = threshold - state.region_thresholds[region_id];
+            let mut finisher: Option<(usize, f64)> = None;
+            for (pos, &c) in frontier.iter().enumerate() {
+                if state.labels[c] < 0 && threshold_var[c] >= need {
+                    let over = threshold_var[c] - need;
+                    if finisher.map_or(true, |(_, best)| over < best) {
+                        finisher = Some((pos, over));
+                    }
+                }
+            }
+            let idx = match finisher {
+                Some((pos, _)) => pos,
+                None => rng.gen_range(0..frontier.len()),
+            };
             frontier.swap_remove(idx)
         };
 
@@ -467,9 +527,30 @@ fn grow_region(
     }
 }
 
-/// Assign enclaves to valid regions (regions that meet threshold)
+/// Increase in a region's SSD if `area` joins it: n/(n+1) * |x - mean|^2.
+fn ssd_increase(attrs: &[Vec<f64>], members: &[usize], area: usize) -> f64 {
+    if members.is_empty() {
+        return 0.0;
+    }
+    let n = members.len() as f64;
+    let p = attrs[area].len();
+    let mut d = 0.0;
+    for c in 0..p {
+        let mean = members.iter().map(|&m| attrs[m][c]).sum::<f64>() / n;
+        let diff = attrs[area][c] - mean;
+        d += diff * diff;
+    }
+    n / (n + 1.0) * d
+}
+
+/// Assign enclaves to valid regions (regions that meet threshold).
+///
+/// An enclave touching several valid regions joins the one whose
+/// heterogeneity it raises least (Duque, Anselin & Rey 2012); the order in
+/// which enclaves are processed stays random.
 fn assign_enclaves_to_valid_regions(
     state: &mut RegionState,
+    attrs: &[Vec<f64>],
     threshold_var: &[f64],
     threshold: f64,
     adj: &AdjList,
@@ -540,8 +621,16 @@ fn assign_enclaves_to_valid_regions(
                 continue;
             }
 
-            // Pick a random valid neighboring region
-            let region_id = *neighbor_regions.choose(rng).unwrap();
+            // Join the most similar valid neighbouring region
+            let region_id = neighbor_regions
+                .iter()
+                .copied()
+                .min_by(|&a, &b| {
+                    ssd_increase(attrs, &state.region_members[a], enclave)
+                        .partial_cmp(&ssd_increase(attrs, &state.region_members[b], enclave))
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .unwrap();
             state.add_to_region(enclave, region_id, threshold_var);
             assigned_any = true;
         }
@@ -637,29 +726,6 @@ fn compact_regions(state: &mut RegionState) {
     state.n_regions = non_empty.len();
 }
 
-/// Compute Manhattan distances for neighboring pairs only
-fn compute_neighbor_distances(
-    attrs: &[Vec<f64>],
-    adj: &AdjList,
-) -> HashMap<(usize, usize), f64> {
-    let mut distances = HashMap::new();
-
-    for (i, neighbors) in adj.neighbors.iter().enumerate() {
-        for &j in neighbors {
-            if i < j {
-                let dist: f64 = attrs[i]
-                    .iter()
-                    .zip(attrs[j].iter())
-                    .map(|(a, b)| (a - b).abs())
-                    .sum();
-                distances.insert((i, j), dist);
-            }
-        }
-    }
-
-    distances
-}
-
 /// Simulated annealing to minimize within-region dissimilarity (and maximize compactness)
 fn simulated_annealing(
     mut state: RegionState,
@@ -667,7 +733,6 @@ fn simulated_annealing(
     threshold_var: &[f64],
     threshold: f64,
     adj: &AdjList,
-    _neighbor_distances: &HashMap<(usize, usize), f64>,
     n_iterations: usize,
     cooling_rate: f64,
     tabu_length: usize,
