@@ -19,14 +19,19 @@
 #' @param cost_matrix Optional. Pre-computed distance/cost matrix (demand x facilities).
 #' @param distance_metric Distance metric: "euclidean" (default) or "manhattan".
 #' @param verbose Logical. Print solver progress.
+#' @param fixed_col Optional column name in `facilities` indicating which
+#'   facilities are pre-selected. The column should be logical (`TRUE` for
+#'   fixed) or character (`"required"`/`"candidate"`). Fixed facilities are
+#'   always opened (and their `facility_cost_col` cost, if any, is incurred);
+#'   with a fixed `n_facilities`, the solver optimizes the remaining slots.
 #'
 #' @return A list with two sf objects:
 #'   \itemize{
 #'     \item `$demand`: Original demand sf with `.facility` column (primary assignment)
 #'       and `.split` column (TRUE if demand is split across facilities), and
 #'       `.cost` column (cost to the primary facility, from the original cost matrix)
-#'     \item `$facilities`: Original facilities sf with `.selected`, `.n_assigned`,
-#'       and `.utilization` columns
+#'     \item `$facilities`: Original facilities sf with `.selected`, `.fixed`,
+#'       `.n_assigned`, and `.utilization` columns
 #'   }
 #'   Metadata is stored in the "spopt" attribute, including:
 #'   \itemize{
@@ -34,6 +39,7 @@
 #'     \item `mean_distance`: Mean weighted distance
 #'     \item `n_split_demand`: Number of demand points split across facilities
 #'     \item `allocation_matrix`: Full allocation matrix (n_demand x n_facilities)
+#'     \item `n_fixed`, `fixed_col`, `fixed_facilities`: Fixed-facility details
 #'   }
 #'
 #' @details
@@ -101,7 +107,8 @@ cflp <- function(demand,
                  facility_cost_col = NULL,
                  cost_matrix = NULL,
                  distance_metric = "euclidean",
-                 verbose = FALSE) {
+                 verbose = FALSE,
+                 fixed_col = NULL) {
   # Input validation
   if (!inherits(demand, "sf")) {
     stop("`demand` must be an sf object", call. = FALSE)
@@ -162,6 +169,11 @@ cflp <- function(demand,
     stop("When n_facilities = 0, must provide facility_cost_col", call. = FALSE)
   }
 
+  # In cost-based mode (n_facilities = 0) any number of facilities may be fixed
+  fixed_facilities <- resolve_fixed_facilities(
+    fixed_col, facilities, if (n_facilities == 0) n_fac else n_facilities
+  )
+
   # Compute cost matrix if needed
   if (is.null(cost_matrix)) {
     cost_matrix <- distance_matrix(demand, facilities, type = distance_metric)
@@ -199,7 +211,8 @@ cflp <- function(demand,
     weights,
     capacities,
     n_facilities,
-    facility_costs
+    facility_costs,
+    fixed_facilities
   )
 
   end_time <- Sys.time()
@@ -231,6 +244,7 @@ cflp <- function(demand,
   # Mark selected facilities
   selected_indices <- result$selected
   facilities_result$.selected <- seq_len(n_fac) %in% selected_indices
+  facilities_result$.fixed <- seq_len(n_fac) %in% fixed_facilities
   facilities_result$.n_assigned <- 0L
   facilities_result$.utilization <- 0.0
 
@@ -253,6 +267,9 @@ cflp <- function(demand,
     mean_distance = result$mean_distance,
     n_split_demand = result$n_split_demand,
     allocation_matrix = allocation_matrix,
+    n_fixed = length(fixed_facilities),
+    fixed_col = fixed_col,
+    fixed_facilities = fixed_facilities,
     solve_time = as.numeric(difftime(end_time, start_time, units = "secs")),
     solver_status = result$status
   )

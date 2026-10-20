@@ -1,5 +1,7 @@
 # spopt (development version)
 
+* `cflp()` gains a `fixed_col` argument, like `p_median()` and `mclp()`, to require that certain facilities open (for example, existing sites). Results gain a `.fixed` column and `n_fixed`, `fixed_col` and `fixed_facilities` metadata.
+
 * `spider_lines()` gains a `facilities` argument to draw links for selected facilities only. Filtering happens before any geometry is built, so one store's trade area from a large `huff()` result takes milliseconds instead of seconds.
 
 # spopt 0.1.3

@@ -13,7 +13,8 @@ cflp(
   facility_cost_col = NULL,
   cost_matrix = NULL,
   distance_metric = "euclidean",
-  verbose = FALSE
+  verbose = FALSE,
+  fixed_col = NULL
 )
 }
 \arguments{
@@ -39,6 +40,12 @@ the solver determines the optimal number of facilities to minimize total cost.}
 \item{distance_metric}{Distance metric: "euclidean" (default) or "manhattan".}
 
 \item{verbose}{Logical. Print solver progress.}
+
+\item{fixed_col}{Optional column name in \code{facilities} indicating which
+facilities are pre-selected. The column should be logical (\code{TRUE} for
+fixed) or character (\code{"required"}/\code{"candidate"}). Fixed facilities are
+always opened (and their \code{facility_cost_col} cost, if any, is incurred);
+with a fixed \code{n_facilities}, the solver optimizes the remaining slots.}
 }
 \value{
 A list with two sf objects:
@@ -46,8 +53,8 @@ A list with two sf objects:
 \item \verb{$demand}: Original demand sf with \code{.facility} column (primary assignment)
 and \code{.split} column (TRUE if demand is split across facilities), and
 \code{.cost} column (cost to the primary facility, from the original cost matrix)
-\item \verb{$facilities}: Original facilities sf with \code{.selected}, \code{.n_assigned},
-and \code{.utilization} columns
+\item \verb{$facilities}: Original facilities sf with \code{.selected}, \code{.fixed},
+\code{.n_assigned}, and \code{.utilization} columns
 }
 Metadata is stored in the "spopt" attribute, including:
 \itemize{
@@ -55,6 +62,7 @@ Metadata is stored in the "spopt" attribute, including:
 \item \code{mean_distance}: Mean weighted distance
 \item \code{n_split_demand}: Number of demand points split across facilities
 \item \code{allocation_matrix}: Full allocation matrix (n_demand x n_facilities)
+\item \code{n_fixed}, \code{fixed_col}, \code{fixed_facilities}: Fixed-facility details
 }
 }
 \description{

@@ -554,7 +554,7 @@
 # Minimize transport + facility costs with capacity constraints.
 # ---------------------------------------------------------------------------
 .solve_cflp <- function(cost_matrix, weights, capacities, n_facilities,
-                        facility_costs) {
+                        facility_costs, fixed_facilities = NULL) {
   n_d <- nrow(cost_matrix)
   n_f <- ncol(cost_matrix)
 
@@ -568,6 +568,7 @@
 
   lower <- rep(0, n_vars)
   upper <- rep(1, n_vars)
+  lower[fixed_facilities] <- 1
   types <- c(rep("I", n_f), rep("C", n_d * n_f))
 
   # Build constraints using assignment helper, then append capacity rows

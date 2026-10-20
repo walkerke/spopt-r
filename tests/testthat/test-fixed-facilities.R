@@ -151,3 +151,72 @@ test_that("NULL fixed_col preserves backward compatibility", {
   expect_equal(meta$n_fixed, 0)
   expect_true(all(!result$facilities$.fixed))
 })
+
+test_that("cflp with fixed_col opens fixed facilities", {
+  skip_if_not_installed("sf")
+
+  d <- make_test_data(fixed_logical = c(FALSE, FALSE, FALSE, TRUE, rep(FALSE, 4)))
+  d$facilities$cap <- 1000
+  free <- cflp(d$demand, d$facilities, n_facilities = 3,
+               weight_col = "pop", capacity_col = "cap")
+  result <- cflp(d$demand, d$facilities, n_facilities = 3,
+                 weight_col = "pop", capacity_col = "cap", fixed_col = "fixed")
+
+  meta <- attr(result, "spopt")
+  selected <- which(result$facilities$.selected)
+
+  expect_true(4 %in% selected)
+  expect_equal(length(selected), 3)
+  expect_equal(meta$n_fixed, 1)
+  expect_equal(meta$fixed_facilities, 4L)
+  expect_equal(result$facilities$.fixed, c(FALSE, FALSE, FALSE, TRUE, rep(FALSE, 4)))
+  # Forcing a site open can't beat the unconstrained optimum
+  expect_gte(meta$objective, attr(free, "spopt")$objective - 1e-6)
+  # Capacities still hold
+  expect_true(all(result$facilities$.utilization <= 1 + 1e-9))
+})
+
+test_that("cflp fixed_col works in cost-based mode", {
+  skip_if_not_installed("sf")
+
+  d <- make_test_data(fixed_status = c("required", "required", "required",
+                                       rep("candidate", 5)))
+  d$facilities$cap <- 2000
+  d$facilities$fixed_cost <- 1e6  # high enough that the solver opens one site
+  result <- cflp(d$demand, d$facilities, n_facilities = 0,
+                 weight_col = "pop", capacity_col = "cap",
+                 facility_cost_col = "fixed_cost", fixed_col = "status")
+
+  selected <- which(result$facilities$.selected)
+  expect_true(all(1:3 %in% selected))
+  expect_equal(attr(result, "spopt")$n_fixed, 3)
+})
+
+test_that("cflp fixed_col validation and NULL default", {
+  skip_if_not_installed("sf")
+
+  d <- make_test_data(fixed_logical = c(TRUE, TRUE, TRUE, rep(FALSE, 5)))
+  d$facilities$cap <- 1000
+  expect_error(
+    cflp(d$demand, d$facilities, n_facilities = 2,
+         weight_col = "pop", capacity_col = "cap", fixed_col = "fixed"),
+    "more fixed"
+  )
+
+  result <- cflp(d$demand, d$facilities, n_facilities = 3,
+                 weight_col = "pop", capacity_col = "cap")
+  expect_equal(attr(result, "spopt")$n_fixed, 0)
+  expect_true(all(!result$facilities$.fixed))
+})
+
+test_that("cflp keeps positional compatibility for verbose", {
+  skip_if_not_installed("sf")
+
+  d <- make_test_data()
+  d$facilities$cap <- 1000
+  # Calls written before fixed_col existed pass verbose in eighth position
+  result <- cflp(d$demand, d$facilities, 3, "pop", "cap", NULL, NULL,
+                 "euclidean", FALSE)
+  expect_equal(sum(result$facilities$.selected), 3)
+  expect_equal(attr(result, "spopt")$n_fixed, 0)
+})
